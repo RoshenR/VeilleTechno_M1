@@ -2,7 +2,7 @@
 
 > Transforme tes idées de projet en veille utile pour les concrétiser et les faire évoluer.
 
-StackSignal propose, pour chaque projet décrit par l’utilisateur (objectifs, stack actuelle ou envisagée, stade, contraintes), une sélection d’actualités et de ressources collectées dans des sources publiques vérifiées. Chaque recommandation indique **ce qu’elle apporte**, **pourquoi elle concerne ce projet**, **ce qu’on pourrait en faire** et **la source qui permet de vérifier**.
+StackSignal propose, pour chaque projet décrit par l’utilisateur (objectifs, stack actuelle ou envisagée, stade, contraintes), une sélection d’actualités et de ressources collectées dans des sources publiques vérifiées, et compare les dépendances importées aux avis de sécurité connus. Chaque recommandation indique **ce qu’elle apporte**, **pourquoi elle concerne ce projet**, **ce qu’on pourrait en faire** et **la source qui permet de vérifier**.
 
 Public : développeurs indépendants, freelances et étudiants qui mènent plusieurs projets.
 
@@ -13,38 +13,37 @@ Public : développeurs indépendants, freelances et étudiants qui mènent plusi
 1. [Ce qui fonctionne](#ce-qui-fonctionne)
 2. [Démarrage rapide (local)](#démarrage-rapide-local)
 3. [Commandes](#commandes)
-4. [Configuration des services](#configuration-des-services)
-5. [Planification et hébergement](#planification-et-hébergement)
+4. [Configuration des services](#configuration-des-services) — Supabase, **jeton GitHub**, exploitation, IA
+5. [Planification, collecte et exploitation](#planification-collecte-et-exploitation)
 6. [Architecture](#architecture)
-7. [Classement explicable](#classement-explicable)
-8. [Sources et collecte](#sources-et-collecte)
-9. [IA facultative](#ia-facultative)
-10. [Confidentialité et sécurité](#confidentialité-et-sécurité)
-11. [Mode démo](#mode-démo)
-12. [Tests et vérifications réalisées](#tests-et-vérifications-réalisées)
-13. [Hypothèses et décisions](#hypothèses-et-décisions)
-14. [Limites connues](#limites-connues)
-15. [Dépannage](#dépannage)
-16. [Hors périmètre (versions suivantes)](#hors-périmètre-versions-suivantes)
+7. [Flux : filtres, recherche et pagination](#flux--filtres-recherche-et-pagination)
+8. [Classement explicable et retours](#classement-explicable-et-retours)
+9. [Sécurité des dépendances](#sécurité-des-dépendances)
+10. [Sources, sources francophones et propositions](#sources-sources-francophones-et-propositions)
+11. [Interface : design system, 3D, interactions](#interface--design-system-3d-interactions)
+12. [IA facultative](#ia-facultative)
+13. [Confidentialité et sécurité](#confidentialité-et-sécurité)
+14. [Tests, CI et vérifications réalisées](#tests-ci-et-vérifications-réalisées)
+15. [Mesures de performance](#mesures-de-performance)
+16. [Limites connues et fonctionnalités reportées](#limites-connues-et-fonctionnalités-reportées)
+17. [Dépannage](#dépannage)
 
 ---
 
 ## Ce qui fonctionne
 
-- Comptes individuels (Supabase Auth) : inscription, connexion, déconnexion, mot de passe oublié / nouveau mot de passe.
-- Projets privés multiples : création rapide (nom + description), stack facultative et structurée (statut utilisée / envisagée / à explorer, version, catégorie), stade, type, besoins suivis, contraintes, notes, archivage, suppression confirmée.
-- Détection des technologies dans la description par catalogue d’alias (suggestions **à valider**, jamais ajoutées automatiquement). Suggestion IA en option.
-- Collecte réelle RSS/Atom + GitHub Releases, catalogue de 28 sources vérifiées, ajout d’un dépôt public `owner/repo`.
-- Moteur de classement déterministe, testé, expliqué critère par critère ; fonctionne sans IA.
-- « Ma veille » : vue globale regroupée par contenu ou par projet, jusqu’à 5 prioritaires (jamais complétés artificiellement), actualités récentes et ressources de fond séparées, filtres (projet, technologie, type, source, date, lecture), tri pertinence/date, pagination, état de la collecte et sources en échec, actualisation manuelle limitée.
-- Détail d’un contenu : faits vérifiables (source, dates de publication/collecte/vérification, tag, extrait), interprétation **séparée pour chaque projet**, action suggérée si justifiée, enrichissement IA facultatif.
-- Favoris, lu/non lu, notes personnelles (par utilisateur) ; retours « Peu pertinent » avec motif et actions (par projet), réversibles.
-- Enregistrés (favoris + liens manuels), Actions (statuts à étudier / à faire / terminé / abandonné), Paramètres (langues, intérêts, sujets exclus, sources masquées, état des services, IA).
-- Mode démo isolé, thème clair/sombre, navigation clavier, mise en page mobile.
+- Comptes individuels (Supabase Auth), projets privés multiples (stack facultative et structurée, stade, besoins, contraintes, notes, archivage).
+- Collecte réelle RSS/Atom + GitHub Releases (30 sources vérifiées dont 3 francophones), ajout d’un dépôt public `owner/repo`, client GitHub centralisé (quotas, `Retry-After`, reprise persistée).
+- **Ma veille** : bandeau « À retenir » (jusqu’à 3 éléments réels) avec radar 3D décoratif, recherche, filtres groupés avec puces actives, sections **Actualités / Sécurité / Ressources de fond**, pagination par curseur en SQL, détail en panneau latéral.
+- **Peu pertinent** avec 5 raisons facultatives, effets bornés par projet, préférences apprises consultables et réinitialisables.
+- **Sécurité** : import `package.json` / `package-lock.json` v2-v3 (analysé dans le navigateur), aperçu avant remplacement, instantanés datés, comparaison semver déterministe avec les GitHub Advisories *reviewed* (npm), historique des conclusions.
+- **Synthèse de la semaine** filtrable par projet ; **proposition de sources** avec modération restreinte.
+- Interactions immédiates (enregistrer, lu, retours) avec retour arrière et « Annuler » ; palette **Ctrl/Cmd + K**, aide des raccourcis (`?`), Échap partout.
+- Thèmes clair/sombre, réglage « Effets visuels », respect de `prefers-reduced-motion`, navigation mobile dédiée.
 
 ## Démarrage rapide (local)
 
-Prérequis : Node.js ≥ 20.9, npm, Docker Desktop (pour Supabase local).
+Prérequis : Node.js ≥ 20.9, npm, Docker Desktop.
 
 ```bash
 npm install
@@ -54,25 +53,27 @@ npm install
 npx supabase start
 ```
 
-Créer `.env.local` à partir de `.env.example` et y reporter `API_URL`, `PUBLISHABLE_KEY` et `SECRET_KEY` affichés par :
+Créer `.env.local` depuis `.env.example` avec `API_URL`, `PUBLISHABLE_KEY`, `SECRET_KEY` de :
 
 ```bash
 npx supabase status -o env
 ```
 
-Collecter les sources réelles (≈ 10 s, 28 sources) :
+Collecter, puis (facultatif) créer un compte de revue local avec deux projets :
 
 ```bash
 npm run ingest
 ```
 
-Lancer l’application puis ouvrir http://localhost:3000 :
+```bash
+npm run seed:local
+```
 
 ```bash
 npm run dev
 ```
 
-En local, la confirmation d’e-mail est désactivée (`supabase/config.toml`) ; les e-mails (réinitialisation) sont visibles dans Mailpit : http://127.0.0.1:54324.
+> ⚠️ `next build` / `next start` chargent `.env.production.local` s’il existe (par exemple après `vercel env pull`). Les scripts `ingest`, `github:check` et `seed:local` n’utilisent que `.env.local` sauf `NODE_ENV=production` explicite, et `seed:local` refuse toute base non locale.
 
 ## Commandes
 
@@ -80,185 +81,233 @@ En local, la confirmation d’e-mail est désactivée (`supabase/config.toml`) ;
 | --- | --- |
 | `npm run dev` | Serveur de développement |
 | `npm run build` / `npm start` | Build et serveur de production |
-| `npm run typecheck` | Génère les types de routes Next puis `tsc --noEmit` (TypeScript strict) |
-| `npm run lint` | ESLint (config Next) |
-| `npm test` | Vitest : règles métier + intégration Supabase (ignorée si l’environnement Supabase est absent) |
-| `npm run test:e2e` | Playwright (desktop + mobile) — nécessite Supabase local et du contenu collecté |
-| `npm run ingest` | Collecte + recalcul des analyses, par lots, jusqu’à épuisement. `npm run ingest -- --force` rend toutes les sources dues (les requêtes restent conditionnelles) |
-| `npm run db:types` | Régénère `src/lib/database.types.ts` depuis la base locale |
+| `npm run typecheck` | Types de routes Next + `tsc --noEmit` |
+| `npm run lint` | ESLint |
+| `npm test` | Vitest : unitaires + intégration Supabase (ignorée sans environnement local) |
+| `npm run test:e2e` | Playwright (desktop + Pixel 7), Supabase local et contenu collecté requis |
+| `npm run ingest` | Collecte + recalculs + avis de sécurité, par lots. `-- --force` rend toutes les sources dues |
+| `npm run github:check` | Vérifie le jeton GitHub via `/rate_limit` (ne consomme pas le quota principal) et affiche les en-têtes de quota, jamais le jeton |
+| `npm run seed:local` | Compte de revue local (`revue@stacksignal.test`), refuse une base non locale |
+| `npm run db:types` | Régénère `src/lib/database.types.ts` |
 
 ## Configuration des services
 
 ### Supabase (hébergé)
 
-1. Créer un projet, puis appliquer les migrations : `npx supabase link --project-ref <ref>` puis `npx supabase db push`.
-2. Renseigner `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`.
-3. Authentication → URL Configuration : `Site URL` = URL de production ; ajouter `https://<domaine>/**` aux Redirect URLs.
-4. Modèles d’e-mail : les liens doivent pointer vers `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=<type>&next=<chemin>` (le gestionnaire accepte aussi le flux PKCE `?code=`).
+1. Appliquer les migrations : `npx supabase link --project-ref <ref>` puis `npx supabase db push`. La migration `20261030000000_v2_reliability_security.sql` est **non destructive** (ajouts de tables, colonnes, index, fonctions ; seule la contrainte `project_feedback.reason` est élargie).
+2. Variables : `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`.
+3. Auth → URL Configuration : Site URL et Redirect URLs `https://<domaine>/**` ; liens d’e-mail vers `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=<type>&next=<chemin>`.
 
-### GitHub
+### Jeton GitHub (`GITHUB_TOKEN`) — **non configuré en production à ce jour**
 
-`GITHUB_TOKEN` facultatif. Sans jeton, l’API publique autorise 60 requêtes/heure par IP : la première collecte (2 pages × 12 dépôts) peut dépasser ce quota ; les dépôts concernés sont reportés automatiquement (respect de `Retry-After`). Un jeton fine-grained **sans permission** suffit pour les dépôts publics.
+Constat : `GITHUB_TOKEN` est absent de `.env.local` et des variables de production Vercel. Sans jeton, l’API GitHub limite à 60 requêtes/heure **par IP** (partagée sur Vercel) : releases et avis de sécurité sont alors reportés.
+
+1. GitHub → Settings → Developer settings → **Fine-grained personal access token** : *Repository access* = « Public repositories (read-only) », **aucune** permission de dépôt ni de compte. Expiration courte (90 jours) et rappel de rotation. Suffit pour `GET /repos/{owner}/{repo}/releases` et `GET /advisories`.
+2. Vercel → Project → Settings → Environment Variables : `GITHUB_TOKEN` (type *Sensitive*), environnements **Production** (et Preview si souhaité). Jamais de préfixe `NEXT_PUBLIC_`, jamais commité, jamais affiché dans les logs (le client ne l’envoie qu’à `api.github.com`).
+3. **Redéployer** : les variables ne s’appliquent qu’aux nouveaux déploiements.
+4. Vérifier : `npm run github:check` (avec la variable en local) doit afficher « Appel authentifié : oui » et un quota de 5 000. En production, la page Paramètres → Services indique si le jeton est présent.
+
+Ce secret de déploiement est distinct du `GITHUB_TOKEN` éphémère que GitHub Actions injecte dans les workflows (la CI n’en a pas besoin et n’appelle pas l’API).
+
+### Exploitation (facultatif)
+
+| Variable | Effet |
+| --- | --- |
+| `OPS_ALERT_WEBHOOK_URL` | Webhook entrant (Slack/Mattermost/Teams `{text}`, Discord `{content}`) : alerte après 3 collectes planifiées consécutives en échec ou incomplètes, au plus une fois par 12 h (table `ops_alerts`), effacée au retour à la normale. |
+| `OPS_HEARTBEAT_URL` | URL pinguée après chaque collecte réussie (healthchecks.io, Better Stack…) : le service externe alerte quand les pings cessent — y compris si la tâche planifiée ne démarre jamais. |
+| Variable de dépôt GitHub `HEALTHCHECK_URL` | Active `.github/workflows/monitor.yml` (toutes les 6 h) qui interroge `https://<domaine>/api/health/ingestion` ; un échec est notifié par GitHub. |
+
+Sans ces variables, **aucune surveillance n’est active** : le raccordement est livré, il reste à le configurer.
 
 ### IA
 
 Voir [IA facultative](#ia-facultative). Sans clé, l’application est complète.
 
-## Planification et hébergement
+## Planification, collecte et exploitation
 
-Hébergement retenu : **Vercel** (Next.js) + **Supabase**.
-
-- `vercel.json` déclare un cron quotidien (`0 5 * * *`) vers `GET /api/cron/ingest`. Vercel envoie automatiquement `Authorization: Bearer $CRON_SECRET` si la variable `CRON_SECRET` est définie dans le projet.
-- Prérequis : variables d’environnement ci-dessus configurées sur Vercel ; `maxDuration = 300` s (défaut actuel des fonctions Vercel).
-- Le point d’entrée refuse toute requête sans le bon secret (comparaison à temps constant) et répond `409` si une collecte est déjà en cours.
-
-**Lots bornés et reprise.** Chaque appel traite les sources dues par lots de 4 et les projets par lots de 5, dans un budget de 240 s. La progression est stockée en base (`sources.next_fetch_at`, `projects.insights_refreshed_at`, `ingestion_runs`) : un appel suivant reprend où le précédent s’est arrêté (statut `partial`). Aucune dépendance à un processus en mémoire.
-Avec ~30 sources, une passe dure ≈ 10 s : un cron quotidien suffit. Si le catalogue grossit, augmenter la fréquence du cron (plan Pro) ou appeler `npm run ingest` depuis un autre scheduler (GitHub Actions…).
-
-**Concurrence.** Un index unique partiel sur `ingestion_runs (status = 'running')` sert de verrou ; un verrou dont le battement de cœur date de plus de 10 min est considéré comme abandonné.
-
-**Mutualisation.** Une source publique est collectée une seule fois pour tous les comptes. La création d’un projet réutilise les contenus déjà collectés (aucune requête externe). L’ouverture d’un écran ne déclenche jamais de collecte. L’actualisation manuelle est limitée à une fois toutes les 10 minutes par utilisateur et ne recharge que les sources de l’utilisateur non collectées depuis 30 minutes.
+- Vercel Cron quotidien (`vercel.json`, `0 5 * * *`) → `GET /api/cron/ingest`, protégé par `CRON_SECRET` (comparaison à temps constant), `409` si une collecte tourne déjà.
+- **Lots bornés et reprise** : sources par lots de 4, projets par lots de 5, budget 240 s ; la progression est en base (`sources.next_fetch_at`, `projects.insights_refreshed_at`, `ingestion_runs`), un appel suivant reprend (statut `partial`). Verrou : index unique partiel sur `ingestion_runs (status = 'running')`, repris si le battement de cœur a plus de 10 min. Stockage idempotent (`unique (source_id, external_id)` + `unique (canonical_url)`).
+- **Historique** : chaque exécution enregistre début, fin, statut, sources traitées / en échec / **reportées pour quota**, nouveaux contenus, projets recalculés, **avis mis à jour** et erreurs utiles.
+- **Client GitHub centralisé** (`src/domain/sources/github.ts`) : hôte fixe, requêtes sérialisées et espacées (250 ms), en-têtes de quota capturés, pagination par `Link`, cache conditionnel `ETag`. Classification (`classifyDenied`) : `401` → jeton invalide/expiré ; `403/429` + `x-ratelimit-remaining: 0` → quota principal (attente jusqu’à `x-ratelimit-reset`) ; `Retry-After` ou message « secondary rate limit » → limite secondaire (≥ 60 s) ; autre `403` → permission. Un quota atteint **reporte toutes les sources GitHub** jusqu’à la réinitialisation, persistée (`ops_state.github_block`, `sources.next_fetch_at`, `last_error_kind`), sans compter d’échec.
+- **Recalculs ciblés** : `projects.ranking_signature` = empreinte des règles de classement, du catalogue de technologies/alias et du catalogue de sources. Le planificateur recalcule en arrière-plan les projets dont la signature diffère, en plus de ceux dont le flux a changé ; changement de contexte, de stack ou de retour → recalcul immédiat du projet. Favoris, notes et actions ne sont jamais touchés.
+- **Interface** : seule la fraîcheur (« Données du … ») et les sources momentanément indisponibles ou reportées sont affichées ; les diagnostics détaillés restent dans `ingestion_runs`, les journaux et `/api/health/ingestion` (renvoie uniquement `healthy` + date du dernier succès ; `503` au-delà de 36 h).
 
 ## Architecture
 
 ```
 src/
-  domain/                 règles métier, sans UI (testées avec Vitest)
-    technologies.ts       catalogue normalisé + alias non ambigus (= entité Technology)
-    projects.ts           stades, types, besoins, schémas Zod, invalidation du contexte
-    ranking.ts            moteur de classement déterministe
-    insights.ts           recalcul des analyses d’un projet
-    ingestion.ts          lots, verrou, reprise, stockage idempotent
-    ai.ts                 fournisseur interchangeable, prompt, validation Zod des sorties
-    suggestions.ts        action suggérée par règles
-    sources/              catalog.ts, http.ts (timeout, taille, retries, conditionnel), rss.ts, github.ts, normalize.ts
-  lib/supabase/           clients serveur (cookies) et service role
-  lib/feed.ts             requêtes du flux (regroupement, filtres, pagination)
-  app/(auth)/             inscription, connexion, récupération d’accès
-  app/(app)/              écrans authentifiés + mutations.ts (server actions)
-  app/api/cron/ingest     point d’entrée planifié
-  app/demo                démonstration isolée
-  demo/fixtures.ts        données fictives (jamais en base)
-supabase/migrations/      schéma, contraintes, index, RLS
-scripts/ingest.ts         collecte en ligne de commande
-tests/integration/        Supabase réel : RLS, idempotence, invalidation
-tests/e2e/                Playwright
+  domain/                  règles métier sans UI (testées)
+    vocabulary.ts          types et libellés partagés, sûrs côté client
+    ranking.ts             classement déterministe + bornes des retours
+    insights.ts            recalcul par projet, signature, ajustements de retours
+    ingestion.ts           lots, verrou, reprise, quotas, avis, alertes
+    ops.ts                 état d’exploitation, alertes dédupliquées, heartbeat, dernier succès
+    dependencies.ts        import package.json / package-lock (pur, exécuté dans le navigateur)
+    advisory-match.ts      comparaison semver déterministe
+    security.ts            instantanés, constats, synchronisation des avis
+    sources/               catalog, http (classification des erreurs), github (client centralisé), rss, safe-fetch (SSRF)
+  lib/feed.ts              flux via fonctions SQL (curseur)
+  components/              design system, panneau, palette, radar 3D, onglet sécurité…
+  app/(app)/@panel/        route interceptée : détail en panneau latéral
+  app/(app)/synthese       synthèse hebdomadaire
+  app/(app)/moderation     modération des propositions (admins)
+  app/api/health/ingestion surveillance du dernier succès
+supabase/migrations/       init + v2 (non destructive)
+.github/workflows/         ci.yml, monitor.yml
 ```
 
-Stack : Next.js 16 (App Router, TypeScript strict, `proxy.ts`), Tailwind CSS 4, shadcn/ui (base Base UI), Supabase (`@supabase/ssr`, PostgreSQL 17), Zod 4, fast-xml-parser, Vitest, Playwright.
+## Flux : filtres, recherche et pagination
 
-Modèle de données (`supabase/migrations/20261029000000_init.sql`) : `profiles`, `preferences`, `sources`, `project_sources`, `content_items`, `projects`, `project_technologies`, `project_insights`, `user_content_state`, `project_feedback`, `project_resources`, `project_actions`, `ingestion_runs`. L’entité *Technology* est le catalogue versionné `src/domain/technologies.ts` (les technologies hors catalogue sont acceptées dans `project_technologies`).
+- `feed_items(...)` (SQL, `security invoker` → RLS) regroupe les analyses par contenu et applique **dans la base** projet, technologie, type, source, période, lecture et recherche (`ILIKE` échappé, index trigrammes `pg_trgm` sur titre et extrait).
+- `feed_page(...)` : pagination **keyset** sur `(score, date, id)` (pertinence) ou `(date, id)` ; `id` départage les égalités. Aucun chargement de tout le flux dans le navigateur ; 15 éléments par page.
+- **Changement de classement entre pages** : le curseur embarque la version de classement (dernier recalcul des projets concernés). Si elle a changé, un bandeau l’indique et propose « Revenir au début » (stratégie explicite plutôt qu’un mélange silencieux).
+- Retour depuis un détail : le détail s’ouvre dans un panneau (route interceptée) au-dessus de la liste ; fermer revient en arrière dans l’historique → filtres, projet sélectionné, position de lecture et focus conservés.
 
-## Classement explicable
+## Classement explicable et retours
 
 Score interne 0–100 par couple projet/contenu (jamais affiché en pourcentage) :
 
-| Facteur | Bornes avec stack | Sans stack | Règle |
+| Facteur | Avec stack | Sans stack | Règle |
 | --- | --- | --- | --- |
-| Technologies | 0–40 | 0 | Alias dans le titre (×1) ou l’extrait / source dédiée (×0,75), pondéré par le statut (utilisée 1, envisagée 0,6, à explorer 0,5) ; +5 par technologie supplémentaire |
-| Besoins | 0–25 | 0–45 | Mots-clés FR/EN des besoins suivis (72 % au premier, 100 % à partir de deux) ; intérêts du compte : bonus ≤ 20 % |
-| Stade | 0–15 | 0–35 | Adéquation type de contenu / stade (idée → conception, comparatifs ; développement → docs, intégrations ; production → compatibilité, dépréciations, sécurité). Préversion : ×0,6 (×0,3 en production) |
+| Technologies | 0–40 | 0 | Alias dans le titre (×1) ou l’extrait / source dédiée (×0,75), pondéré par le statut ; +5 par technologie supplémentaire |
+| Besoins | 0–25 | 0–45 | Mots-clés FR/EN des besoins (72 % puis 100 %) ; intérêts : bonus ≤ 20 % |
+| Stade | 0–15 | 0–35 | Adéquation type de contenu / stade ; préversion ×0,6 (×0,3 en production) |
 | Source | 0–10 | 0–10 | Officielle = 10, sinon qualité déclarée |
-| Fraîcheur | 0–10 | 0–10 | Actualités : ≤7 j = 10, ≤30 j = 7, ≤90 j = 4, ≤1 an = 1, sinon 0. Ressources de fond : ≤2 ans = 8, sinon 5. Date inconnue = 2 |
-| Retour « mauvaise source » | −10 par retour, max −20 | idem | Baisse la source pour ce projet sans la masquer |
+| Fraîcheur | 0–10 | 0–10 | Actualités : 10 → 0 selon l’âge ; ressources de fond : 8 / 5 ; date inconnue = 2 |
+| Retours (ce projet seulement) | −24 max | idem | Voir ci-dessous |
 
-- **Inclusion** : correspondance de technologie **ou** de besoin obligatoire, puis score ≥ 30. La fraîcheur ou la qualité seules ne suffisent jamais.
-- **Exclusions** : projet en pause/archivé, retour « Peu pertinent » (mauvais sujet / niveau / déjà connu masquent ce contenu pour ce projet), source masquée, langue non choisie, sujet exclu.
-- **Priorité** (distincte de la certitude) : *Action prioritaire* seulement si sécurité/changement important sur une technologie **utilisée**, en développement ou production, source officielle **et** version majeure déclarée retrouvée dans le texte ; sinon *Applicabilité à vérifier*. *À surveiller* : release/actualité sur une technologie utilisée (score ≥ 50). *À explorer* : le reste, et toujours pour les technologies envisagées (découverte, pas alerte).
-- **Prioritaires** : 5 au plus, non lus, score ≥ 65, hors préversions — la section disparaît s’il n’y en a pas.
-- Les phrases « Pourquoi pour ce projet ? » et la liste « Critères appliqués » sont générées à partir des mêmes facteurs que le score.
+**« Peu pertinent »** (raisons facultatives), enregistré au niveau **projet + contenu** avec un instantané des technologies et de la source concernées :
 
-## Sources et collecte
+| Raison | Effet (borné, réversible) |
+| --- | --- |
+| Mauvais sujet | Retire le contenu de ce projet ; −4 par retour sur la technologie concernée, **plafond −8** |
+| Mauvais niveau technique | Retire le contenu ; −3 par retour sur ce type de contenu, plafond −6 |
+| Déjà connu | Retire le contenu et le marque **lu** pour l’utilisateur ; **aucun effet sur le sujet** |
+| Mauvaise source | −10 par retour sur la source pour ce projet, plafond −20, sans la masquer |
+| Pas utile pour ce projet / sans préciser | Retire le contenu de **ce projet uniquement** |
 
-Catalogue vérifié le 2026-10-29 (`src/domain/sources/catalog.ts`) : 16 flux RSS/Atom (Next.js, React, Supabase, GitHub Changelog, Node.js, PostgreSQL, TypeScript, Tailwind CSS, Expo changelog, Stripe, Deno, Cloudflare, MDN, web.dev, Smashing Magazine, Alsacréations en français) et 12 dépôts GitHub (next.js, react, supabase-js, expo, stripe-node, prisma, drizzle-orm, tailwindcss, playwright, vitest, zod, node).
+Total des pénalités plafonné à −24 : un ou plusieurs clics ne peuvent pas exclure une technologie. Les ajustements apparaissent dans « Critères appliqués » et dans « Pourquoi pour ce projet ? » (« rang abaissé d’après tes retours »), consultables et réinitialisables dans la vue d’ensemble du projet (« Préférences apprises »). Langue : un contenu hors des langues choisies est exclu **sauf** annonce officielle de sécurité ou de changement important. Les préférences de lecture n’altèrent jamais une comparaison de sécurité.
 
-Écartés lors de la vérification :
-- `https://vercel.com/atom` : valide mais 4,6 Mo, au-delà de la taille maximale acceptée (3 Mo).
-- `https://playwright.dev/blog/rss.xml` : 404.
-- `facebook/react` et `prisma/prisma` ont été renommés (`react/react`, `prisma/orm`) : le catalogue utilise les noms actuels.
+Jeu d’évaluation : `src/domain/relevance.eval.test.ts` (8 cas représentatifs : sécurité officielle vs tutoriel, projet sans stack, technologie envisagée, bornes des retours, « déjà connu », isolation par projet, langue, fraîcheur seule). Embeddings et recherche vectorielle reportés faute de besoin mesuré.
 
-Connecteurs (`src/domain/sources/`) :
-- délai de 15 s, 3 tentatives max (erreurs réseau et 5xx), pas de nouvelle tentative sur 429/403 (respect de `Retry-After`), taille max 3 Mo lue en flux, hôte final vérifié (GitHub : `api.github.com` uniquement), requêtes conditionnelles `ETag` / `Last-Modified`, 50 éléments max par flux, 2 pages max de 30 releases à la première collecte ;
-- RSS 2.0, RSS 1.0 (RDF) et Atom ; dates invalides ou futures rejetées (→ « Date inconnue ») ; extrait texte borné à 600 caractères — l’article complet n’est jamais recopié ;
-- releases : brouillons ignorés, préversions détectées (`prerelease` ou tag `-alpha/-beta/-rc/-canary/…`) ;
-- déduplication : `unique (source_id, external_id)` + `unique (canonical_url)` (https, sans `www`, sans fragment ni paramètres de suivi, paramètres triés). Pas de fusion par similarité de titre ;
-- `published_at`, `collected_at` (première collecte) et `last_seen_at` (dernière vérification) sont distincts : une vieille ressource collectée tard garde sa date réelle ;
-- échec d’une source : erreur enregistrée, reprise avec backoff exponentiel (30 min → 24 h) ; les autres sources continuent.
+## Sécurité des dépendances
 
-L’application couvre uniquement ces sources : elle ne prétend pas surveiller tout le web. L’ajout de flux arbitraires est volontairement hors périmètre ; seul l’ajout d’un dépôt GitHub public est proposé.
+> L’application **compare des dépendances décrites dans un import** à des avis connus. Elle n’audite ni le code exécuté ni le déploiement.
+
+**Formats pris en charge**
+
+| Fichier | Contenu exploité |
+| --- | --- |
+| `package.json` | `dependencies` (production), `devDependencies`, `optionalDependencies`, `peerDependencies` — plages et versions exactes **déclarées** |
+| `package-lock.json` `lockfileVersion` 2 ou 3 | Section `packages` : versions **résolues**, dépendances directes et transitives, plusieurs versions d’un même package, contexte `dev`/`optional`/`peer` quand le lockfile l’établit |
+
+Refusés avec un message clair : lockfile v1, `yarn.lock`, `pnpm-lock.yaml`, `bun.lock`, JSON sans dépendances, fichiers > 10 Mo, > 10 000 entrées.
+
+**Classification** : version exacte déclarée, plage déclarée (`^2.3.0`), version résolue, alias npm, workspace / lien, dépendance locale (`file:`), URL Git, URL d’archive, étiquette (`latest`), non résolue. Aucune version n’est devinée.
+
+**Traitement** : le fichier est lu **dans le navigateur** ; seuls nom, version, déclaration réduite, portée et caractère direct sont envoyés au serveur, re-validés (Zod) puis stockés. Jamais conservés : scripts, `resolved`, `integrity`, identifiants ou paramètres d’URL. Rien n’est installé ni exécuté ; le fichier brut n’est jamais transmis à un LLM. Un aperçu (entrées, ajouts/retraits, versions changées, noms transmis) précède chaque import ; chaque import crée un **instantané daté** et conserve les précédents.
+
+**Avis** : GitHub Global Security Advisories, `type=reviewed`, `ecosystem=npm` (couverture affichée). Transmis à GitHub : **uniquement des noms de packages npm** (paramètre `affects`), jamais les versions, le nom ou la description du projet ; exclusions possibles (`@mon-org/*`) ; dépendances locales, workspaces et Git jamais transmises. Pagination par curseur `Link`, requête séparée `is_withdrawn=true`. Le planificateur re-vérifie quotidiennement les packages suivis avec `modified>=…`, met à jour les avis modifiés ou retirés et recalcule le dernier instantané des projets concernés ; les anciennes conclusions sont **conservées** (`superseded_at`).
+
+**Comparaison** (`advisory-match.ts`, bibliothèque `semver`, testée) : plages GitHub converties (`>= 1.0.0, < 1.2.3` → `>=1.0.0 <1.2.3`), préversions comparées de façon conservatrice. L’IA n’intervient pas.
+
+| État affiché | Signification |
+| --- | --- |
+| Version importée dans la plage affectée | Risque à examiner — ne démontre pas que les conditions d’exploitation sont réunies |
+| Version importée hors de la plage de cet avis | Pour cet avis seulement |
+| Version exacte inconnue — à vérifier | Plage déclarée chevauchant la plage affectée, ou dépendance Git/locale/étiquette |
+| Analyse indisponible ou incomplète | Quota/erreur GitHub, plage illisible, ou packages non vérifiés |
+| Avis retiré | Avis retiré par sa source (conservé pour l’historique) |
+
+L’onglet **Sécurité** du projet présente instantané, date et couverture, packages concernés (regroupés), versions corrigées documentées **par branche** (même majeure ou changement de majeure à vérifier), liens vers l’avis et création d’une tâche de vérification. Aucune mise à jour automatique, pas de recommandation systématique de la dernière majeure. Masquer une alerte exige une raison et elle reste consultable. L’absence de correspondance ne signifie pas que le projet est sécurisé.
+
+## Sources, sources francophones et propositions
+
+Catalogue (`src/domain/sources/catalog.ts`) : 18 flux RSS/Atom et 12 dépôts GitHub. Sources francophones ajoutées après vérification le 2026-10-29 (HTTP 200, flux valide, publications récentes, adéquation aux technologies) :
+
+- **CERT-FR — avis de sécurité** (`https://cert.cyber.gouv.fr/avis/feed/`, officiel ; l’ancienne URL `cert.ssi.gouv.fr` redirige). Retenu uniquement quand un avis cite une technologie de la stack.
+- **OCTO Talks** (`https://blog.octo.com/feed/`), architecture et pratiques de développement.
+
+Écartés : LinuxFr (trop généraliste), Journal du hacker (agrégateur de qualité inégale), blog Zenika (langues mélangées), Grafikart et les-enovateurs (flux 404). Le classifieur reconnaît désormais « vulnérabilité(s) ».
+
+**Proposer une source** (Paramètres) : URL https, langue, sujets, justification ; contrôles statiques uniquement, **aucune requête ni collecte** à la soumission, 5 propositions en attente maximum. L’auteur voit le statut (en attente / acceptée / refusée) et le retour.
+
+**Modération** (`/moderation`) : réservée aux membres de `app_admins` (vérifié côté serveur et par RLS). Ajouter un modérateur :
+
+```sql
+insert into public.app_admins (user_id) select id from auth.users where email = 'moderateur@exemple.fr';
+```
+
+« Vérifier le flux » passe par `safeFetchText` : https et port 443 uniquement, pas d’identifiants dans l’URL, noms internes refusés, **chaque adresse résolue contrôlée au moment de la connexion** (privées, loopback, link-local dont `169.254.169.254`, CGNAT, ULA, multicast…), redirections suivies manuellement et re-validées (3 max), 10 s, 2 Mo ; le XML est refusé s’il déclare des entités. Accepter enregistre la décision ; l’ajout au catalogue partagé reste une modification revue de `catalog.ts`.
+
+## Interface : design system, 3D, interactions
+
+- **Tokens** (`src/app/globals.css`) : fonds, surfaces (`surface`, `surface-raised`), texte, bordures (`border`, `border-strong`), statuts (`success`, `warning`, `destructive`, `info`), accent turquoise réservé aux actions principales et à la sélection, ombres courtes (`elev-1/2/3`) et diffuses (`elev-float`), reflets (`--highlight`), dégradés légers, grille « radar », durées 150/200/260 ms, focus visible. Deux familles (Geist, Geist Mono pour les versions).
+- Statuts toujours doublés d’un texte et d’une forme/icône. Cibles tactiles ≥ 40 px sur pointeur grossier ; aucune action ne dépend du survol.
+- **Radar 3D** (`components/radar/`) : Three.js (sans R3F), géométrie procédurale (2 disques, 3 anneaux, noyau émissif, balayage). Chargé après le premier rendu dans un chunk séparé (≈ 123 Ko gzip) ; taille réservée (200–210 px desktop, 56 px statique mobile) ; un seul canvas ; DPR ≤ 1,5 ; rendu à la demande (entrée ~0,9 s, inclinaison au survol ±0,14 rad, retour au repos, balayage seulement si une synchronisation est réellement en cours) ; arrêt hors écran et onglet masqué ; libération des ressources ; repli SVG statique si WebGL échoue, sur mobile, avec `prefers-reduced-motion` ou « Effets visuels » désactivé (préférence en base). Purement décoratif (`aria-hidden`).
+- Cartes de projet : perspective ≤ 3° sur pointeur précis uniquement.
+- **Interactions** : store client partagé (`content-state.tsx`) — mise à jour immédiate, confirmation serveur, compteur par élément contre les réponses dans le désordre, retour arrière + « Réessayer », « Annuler » pour lu / retiré / retour « Peu pertinent ». Notifications `aria-live` qui ne prennent pas le focus.
+- **Raccourcis** : `Ctrl/Cmd + K` ou `/` (palette : pages, projets, contenus et liens de l’utilisateur, créer un projet — recherche serveur sous RLS), `?` (aide), `Échap` (panneaux, menus, fenêtres). Les touches simples sont ignorées pendant la saisie.
 
 ## IA facultative
 
-- Fournisseur interchangeable côté serveur (`AiProvider`) : Anthropic (Messages API) ou tout service compatible OpenAI (`AI_PROVIDER=openai-compatible`, `AI_BASE_URL`).
-- Désactivé par défaut pour chaque compte (Paramètres). Déclenché à la demande, uniquement pour les contenus de score ≥ 50, avec un budget quotidien par utilisateur (`AI_DAILY_BUDGET_PER_USER`). Résultat mis en cache dans `project_insights.ai` avec la version de contexte et l’empreinte du contenu : il est ignoré (et signalé) dès que l’un des deux change.
-- Données transmises : titre, extrait, type, source et date du contenu ; stade, type, besoins, stack et contraintes du projet. **Jamais** les notes ni les données de compte.
-- Le contenu est encadré comme donnée non fiable ; la sortie JSON est validée par Zod ; les citations doivent exister mot pour mot dans le titre/l’extrait et référencer l’identifiant fourni, sinon elles sont retirées ; sans citation valide, les « faits » deviennent des « inférences » ; sans extrait, aucun résumé n’est accepté. Les liens affichés viennent toujours de la base.
-- Sans clé, en cas d’erreur ou de quota : collecte, classement, favoris et actions fonctionnent ; les explications viennent des règles.
+Inchangé : fournisseur interchangeable, désactivé par défaut, budget quotidien, données transmises limitées (jamais les notes), sorties validées, citations vérifiées. Un résumé généré pour une source non francophone est marqué « Résumé traduit ».
 
 ## Confidentialité et sécurité
 
-- RLS activée sur toutes les tables. Contenus publics (`sources`, `content_items`, `ingestion_runs`) : lecture seule pour les comptes authentifiés, écriture réservée à la clé de service. Données privées : propriétaire uniquement, y compris via les tables enfants (`owns_project()`), avec `with check` qui empêche l’usurpation d’`owner_id` / `user_id`. Le rôle `anon` n’a aucun accès.
-- Les server actions utilisent le client de l’utilisateur (RLS) ; la clé de service n’est utilisée que pour le catalogue public, après vérification de propriété.
-- L’identité est vérifiée par `getClaims()` (signature du JWT), jamais par `getSession()` côté serveur.
-- Cache Components de Next.js désactivé : toutes les pages sont rendues par requête, rien de privé ne passe par un cache partagé. Les logs ne contiennent ni contenu privé ni secret.
-- Supprimer un projet supprime en cascade sa stack, ses abonnements, analyses, retours, ressources et actions, sans toucher aux contenus publics.
-- Les liens manuels sont stockés tels quels (http/https uniquement), sans récupération automatique.
-- Cette veille n’est pas un audit de sécurité : une information de sécurité ou une version majeure n’implique pas qu’un projet soit vulnérable ou cassé.
+- RLS sur toutes les tables. Nouvelles tables privées (`dependency_*`, `finding_dismissals`) : propriétaire du projet uniquement. `security_advisories` : lecture seule. `ops_state`, `ops_alerts`, `advisory_package_checks`, `app_admins` : aucune politique (clé de service seulement). `source_proposals` : l’auteur lit et crée ses propositions **en attente** sans pouvoir les modifier ; seuls les admins modèrent.
+- Fonctions du flux en `security invoker` : la RLS s’applique ; recherche échappée.
+- Clé de service et `GITHUB_TOKEN` côté serveur uniquement ; aucun secret dans les logs ni dans le dépôt.
 
-## Mode démo
+## Tests, CI et vérifications réalisées
 
-`/demo`, accessible sans compte : 3 projets fictifs (SaaS de réservation Next.js/PostgreSQL avec paiement, app mobile Expo hors ligne, idée de plateforme de cours sans stack) et 8 contenus fictifs classés **en mémoire** par le vrai moteur. Chaque élément porte « Donnée de démonstration » ; les bibliothèques et URL sont inventées (`example.com`) pour n’attribuer aucune fausse actualité à une organisation réelle. Les fixtures ne sont jamais écrites en base. Le jeu illustre : release, tutoriel, ressource ancienne utile, contenu non retenu, applicabilité à vérifier, préversion avec titre seul et date inconnue, même contenu expliqué différemment selon le projet.
-
-## Tests et vérifications réalisées
-
-Exécuté le 2026-10-29 sur Windows 11, Node 23.6, Supabase CLI local (PostgreSQL 17) :
+Exécuté le 2026-10-29, Windows 11, Node 23.6, Supabase CLI local (PostgreSQL 17) :
 
 | Vérification | Résultat |
 | --- | --- |
-| `npm run typecheck` | OK |
-| `npm run lint` | OK, 0 avertissement |
-| `npm test` — unitaires (30) | OK : classement avec/sans stack, alias ambigus, fraîcheur et date inconnue, priorités sécurité, exclusions et retours, parsing RSS/Atom, normalisation d’URL, validation `owner/repo`, préversions, requêtes conditionnelles, taille max, retries, rate limit, validation des sorties IA |
-| `npm test` — intégration Supabase (6) | OK : idempotence et déduplication, catalogue public non modifiable, isolation entre deux comptes (lecture, écriture, tables enfants, usurpation `user_id`/`owner_id`), accès anonyme nul, invalidation du contexte avec conservation des favoris/notes, suppression en cascade sans perte de contenu public |
-| `npm run test:e2e` (6, Chromium desktop + Pixel 7) | OK : inscription → projet → veille → favori → action → retour réversible, persistance après rechargement ; projet sans stack ; URL d’un projet d’un autre compte → 404 ; lien d’évitement et focus visible ; démo et écrans sans débordement horizontal en mobile |
+| `npm run typecheck`, `npm run lint` | OK |
+| Vitest unitaires (61) | OK — dont import (plage, exacte, plusieurs versions, alias, workspace, Git, URL avec identifiants, fichiers non pris en charge), semver (plages GitHub, branches, préversions, retiré, illisible), classification quotas/permissions, arrêt des appels après quota, pagination des avis et `is_withdrawn`, SSRF, alertes, jeu d’évaluation de pertinence |
+| Vitest intégration Supabase (13) | OK — isolation entre comptes (imports, constats, masquages, retours, propositions, tables d’exploitation), politiques de modération, pagination keyset sans doublon ni trou + filtres avant pagination, historique avis corrigé puis retiré, signature de classement, détection d’absence d’exécution planifiée |
+| Playwright (7, desktop + Pixel 7) | OK — parcours complet, palette, panneau + Échap + position et focus, effets désactivés + animations réduites, mobile sans débordement ni WebGL |
 | `npm run build` | OK |
-| Collecte réelle (`npm run ingest`) | 28/28 sources, 1 219 contenus ; seconde collecte forcée : 0 doublon (6 dépôts GitHub reportés pour quota non authentifié dépassé, comportement attendu) |
-| Cron | 401 sans secret ou secret faux ; 200 avec secret ; deux appels simultanés → l’un `409 busy` |
-| Navigateur | création de projet, détection de stack, flux réel, modification de version → contexte v2 et recalcul ; démo en thème sombre et clair |
+| Collecte réelle locale | 30/30 sources, 0 échec ; quota GitHub anonyme consommé normalement |
+| Connecteur GitHub Advisories (réel, **non authentifié**) | Import d’un lockfile de test : 4 noms transmis (package privé exclu), 47 constats dont branches 0.x/1.x d’axios |
+| Revue visuelle | 1440 px clair et sombre, 1280 px, 375 px sombre (mobile) : défauts corrigés (barre de défilement des onglets, conflit `hidden`/`inline-flex`, menu masqué par la carte suivante, élément masqué par l’en-tête collant → `scroll-padding-top`) |
 
-Non vérifié : enrichissement IA avec un vrai fournisseur (aucune clé fournie ; testé avec un fournisseur simulé), envoi réel d’e-mails hors Mailpit, déploiement Vercel, audit d’accessibilité outillé complet (axe/Lighthouse).
+Non vérifié : appel GitHub **authentifié** (aucun jeton disponible), webhook d’alerte et heartbeat réels, workflow `monitor.yml` et CI sur GitHub (fichiers livrés, non exécutés sur GitHub), audit d’accessibilité outillé (axe/Lighthouse), zoom 200 % mesuré, contrastes mesurés à l’outil.
 
-## Hypothèses et décisions
+**CI** (`.github/workflows/ci.yml`) : sur push et pull request, `npm ci`, typecheck, lint, tests unitaires, build ; job d’intégration sur un Supabase jetable démarré dans le runner. Aucun secret de production, donc identique pour les contributions externes.
 
-- Dépôt vide → projet initialisé avec la stack demandée, versions stables du 2026-10-29 (Next 16.4, React 19.3, Zod 4, Tailwind 4).
-- Abonnements aux sources **par projet** (`project_sources`), gérés dans l’onglet Stack ; masquage de source au niveau du compte (Paramètres).
-- À la création, un projet suit les sources générales (MDN, web.dev, Smashing, Alsacréations) et celles liées à ses technologies.
-- Les technologies validées depuis les suggestions sont ajoutées comme « envisagées » : aucun choix technique n’est modifié automatiquement.
-- Les notes personnelles ne modifient jamais le contexte (pas de recalcul, pas d’envoi IA).
-- Pagination/regroupement du flux en mémoire sur les 800 meilleures analyses (marqué `ponytail:` dans le code) : suffisant en V1.
-- Démo en lecture seule (aucune action d’écriture affichée).
+## Mesures de performance
 
-## Limites connues
+Conditions : `next build` + `next start` en local, Supabase local, même compte de revue (2 projets, mêmes données), page `/veille`, Chromium du panneau, cache chaud, 3 chargements ; tailles JS calculées en gzip (CompressionStream) sur les scripts du HTML initial.
 
-- Classification du type de contenu par mots-clés (titre, extrait) : imparfaite, notamment pour les articles éditoriaux.
-- Correspondance des besoins par mots-clés FR/EN : pas de compréhension sémantique (recherche vectorielle hors périmètre).
-- Le quota GitHub non authentifié retarde la collecte des releases sans `GITHUB_TOKEN`.
-- Les nouveaux contenus n’entrent dans les analyses existantes qu’au passage du scheduler ou lors d’une actualisation manuelle.
-- `revalidatePath` est utilisé largement après chaque mutation : simple mais pas optimal.
+| Mesure | Avant (f834f76) | Après |
+| --- | --- | --- |
+| JS initial | 14 scripts, 635 Ko bruts, **203 Ko gzip** | 12 scripts, 654 Ko bruts, **208 Ko gzip** |
+| Radar 3D | — | chunk différé ≈ 493 Ko bruts / **123 Ko gzip**, chargé après inactivité, jamais sur mobile ni effets désactivés |
+| `load` (cache chaud) | 238–253 ms | 178–235 ms |
+| Nœuds DOM | 2 154 | 1 087 |
+| CLS | 0–0,004 | 0 |
+| Mise à jour visuelle après « Enregistrer » | aller-retour serveur + rechargement de la page | 8 ms (optimiste) |
+
+Note : une première build intégrait un polyfill `crypto` (≈ +160 Ko gzip) via un import client de `normalize.ts` ; corrigé en isolant `vocabulary.ts`. Mesures indicatives (machine de développement, pas de bridage réseau) : pas de score synthétique annoncé.
+
+## Limites connues et fonctionnalités reportées
+
+- Classification du type de contenu et besoins par mots-clés.
+- Sans `GITHUB_TOKEN`, releases et avis peuvent être reportés (quota anonyme partagé).
+- Lockfiles npm v2/v3 uniquement ; pas de détection de l’état déployé.
+- La synthèse ne s’envoie pas par e-mail.
+- **Reporté** (non affiché comme disponible) : envoi de la synthèse par e-mail (activation volontaire, préférences, désinscription, anti-doublons), recherche sémantique / embeddings, autres lockfiles (yarn, pnpm, bun, v1) et écosystèmes.
 
 ## Dépannage
 
 | Symptôme | Piste |
 | --- | --- |
-| « NEXT_PUBLIC_SUPABASE_URL et SUPABASE_SECRET_KEY sont requis » | `.env.local` incomplet ; voir `npx supabase status -o env`. |
-| `npx supabase start` échoue | Docker Desktop doit être démarré. |
-| Flux vide après création d’un projet | Lancer `npm run ingest`, vérifier les sources suivies (onglet Stack) et les filtres. |
-| Releases GitHub absentes, erreur « Limite de débit » | Définir `GITHUB_TOKEN` ; la reprise est automatique. |
-| Lien d’e-mail « invalide ou expiré » | Vérifier `NEXT_PUBLIC_SITE_URL`, les Redirect URLs Supabase et le modèle d’e-mail (`token_hash`). |
-| Cron renvoie 401 | `CRON_SECRET` absent ou différent entre Vercel et l’appelant. |
-| Cron renvoie 409 | Une collecte est déjà en cours ; un verrou bloqué expire après 10 min. |
-| Bouton IA absent | `AI_API_KEY` non défini, IA désactivée dans Paramètres, ou contenu de score < 50. |
-| Types Supabase désynchronisés après une migration | `npm run db:types`. |
-
-## Hors périmètre (versions suivantes)
-
-Collaboration et espaces partagés, facturation, application mobile native, import de dépôts privés, analyse complète des dépendances, chatbot généraliste, recherche vectorielle, newsletters par e-mail, intégrations de gestion de projet, ajout de flux RSS arbitraires.
+| Releases/avis « reportés (quota) » | Configurer `GITHUB_TOKEN` puis redéployer ; `npm run github:check` |
+| « Analyse indisponible ou incomplète » | Quota GitHub atteint ou clé de service absente : la synchronisation quotidienne complète l’analyse |
+| `next start` local qui contacte la mauvaise base | Supprimer/renommer `.env.production.local` ou exporter les variables locales avant `next build` |
+| Cron 401 / 409 | `CRON_SECRET` différent / collecte déjà en cours (verrou repris après 10 min) |
+| `/api/health/ingestion` en 503 | Aucune collecte réussie depuis 36 h : vérifier le cron Vercel et `ingestion_runs` |
+| Types désynchronisés | `npm run db:types` |

@@ -14,9 +14,13 @@ test("démo et écrans principaux utilisables en largeur mobile", async ({ page 
   await expect(page).toHaveURL(/\/veille/);
   // Bottom navigation replaces the sidebar.
   const nav = page.getByRole("navigation", { name: "Navigation principale" }).last();
-  await expect(nav.getByRole("link", { name: "Mes projets" })).toBeVisible();
-  await nav.getByRole("link", { name: "Paramètres" }).click();
+  await expect(nav.getByRole("link", { name: "Projets" })).toBeVisible();
+  await nav.getByRole("link", { name: "Réglages" }).click();
   await expect(page.getByRole("heading", { name: "Paramètres" })).toBeVisible();
   const overflow2 = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow2).toBeLessThanOrEqual(1);
+  // Mobile renders the radar statically: no WebGL scene is created.
+  await page.goto("/veille");
+  await expect(page.getByRole("heading", { name: "Ma veille" })).toBeVisible();
+  if ((page.viewportSize()?.width ?? 1000) < 768) expect(await page.locator("canvas").evaluateAll((cs) => cs.every((c) => (c as HTMLCanvasElement).width <= 300 && getComputedStyle(c).opacity === "0"))).toBe(true);
 });

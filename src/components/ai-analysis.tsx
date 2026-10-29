@@ -1,7 +1,7 @@
 import type { StoredAnalysis } from "@/domain/ai";
 import { formatDateTime } from "./labels";
 
-export function AiAnalysis({ analysis }: { analysis: StoredAnalysis }) {
+export function AiAnalysis({ analysis, sourceLanguage }: { analysis: StoredAnalysis; sourceLanguage?: string | null }) {
   const facts = analysis.relevance.filter((r) => r.type === "fact");
   const inferences = analysis.relevance.filter((r) => r.type === "inference");
   return (
@@ -9,6 +9,7 @@ export function AiAnalysis({ analysis }: { analysis: StoredAnalysis }) {
       <p className="text-xs font-medium text-primary">
         Analyse IA · {analysis.provider} · {formatDateTime(analysis.generated_at)} · fondée sur {analysis.basis === "title_only" ? "le titre seul" : "l’extrait"}
       </p>
+      {analysis.summary && sourceLanguage && sourceLanguage !== "fr" && <p className="text-xs text-muted-foreground">Résumé traduit : la source est en {sourceLanguage === "en" ? "anglais" : sourceLanguage}.</p>}
       {analysis.summary && <p>{analysis.summary}</p>}
       {facts.length > 0 && (
         <div>

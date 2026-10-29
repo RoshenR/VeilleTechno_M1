@@ -22,6 +22,8 @@ const text = (v: Node): string | null => {
 
 /** Parse RSS 2.0, RSS 1.0 (RDF) or Atom into normalized items. Throws on non-feed documents. */
 export function parseFeed(xml: string, baseUrl: string): NormalizedItem[] {
+  // Feeds never need DTD entities; refusing them rules out entity expansion and external entities.
+  if (/<!ENTITY/i.test(xml)) throw new Error("Document refusé : déclarations d’entités XML non autorisées.");
   const doc = parser.parse(xml) as Record<string, Record<string, unknown>>;
   let raw: { id: string | null; link: string | null; title: string | null; date: string | null; body: string | null }[];
 

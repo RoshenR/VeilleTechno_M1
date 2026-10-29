@@ -9,7 +9,7 @@ export default defineConfig({
   retries: 0,
   use: { baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000", trace: "retain-on-failure", locale: "fr-FR" },
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"] } },
+    { name: "desktop", use: { ...devices["Desktop Chrome"] }, testIgnore: /mobile/ },
     { name: "mobile", use: { ...devices["Pixel 7"] }, testMatch: /mobile/ },
   ],
   webServer: { command: "npm run dev", url: "http://localhost:3000/connexion", reuseExistingServer: true, timeout: 180_000 },

@@ -1,4 +1,4 @@
-// Initial source catalog. Every URL below was fetched on 2026-10-29 and returned a valid RSS/Atom
+// Source catalog. Every URL below was fetched on 2026-10-29 and returned a valid RSS/Atom
 // document (or a 200 from the GitHub API). See README « Sources » for excluded/unavailable feeds.
 
 export type CatalogSource = {
@@ -36,6 +36,9 @@ export const SOURCE_CATALOG: CatalogSource[] = [
   rss("https://web.dev/feed.xml", "web.dev", "https://web.dev/", ["css"], { quality: 9 }),
   rss("https://www.smashingmagazine.com/feed/", "Smashing Magazine", "https://www.smashingmagazine.com/", [], { quality: 7, isOfficial: false }),
   rss("https://www.alsacreations.com/rss/actualites.xml", "Alsacréations — actualités", "https://www.alsacreations.com/", ["css"], { language: "fr", quality: 7, isOfficial: false }),
+  // French sources added 2026-10-29 after checking feed validity, recency and fit (see README « Sources »).
+  rss("https://cert.cyber.gouv.fr/avis/feed/", "CERT-FR — avis de sécurité", "https://cert.cyber.gouv.fr/avis/", [], { language: "fr", quality: 9 }),
+  rss("https://blog.octo.com/feed/", "OCTO Talks", "https://blog.octo.com/", [], { language: "fr", quality: 7, isOfficial: false }),
   gh("vercel/next.js", "Releases Next.js", ["nextjs"]),
   gh("react/react", "Releases React", ["react"]),
   gh("supabase/supabase-js", "Releases supabase-js", ["supabase"]),
@@ -56,6 +59,8 @@ export const GENERAL_SOURCE_KEYS = [
   "https://web.dev/feed.xml",
   "https://www.smashingmagazine.com/feed/",
   "https://www.alsacreations.com/rss/actualites.xml",
+  "https://cert.cyber.gouv.fr/avis/feed/",
+  "https://blog.octo.com/feed/",
 ];
 
 /** Catalog sources a project should follow given its technologies. */

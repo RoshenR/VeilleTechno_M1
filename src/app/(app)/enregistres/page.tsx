@@ -1,6 +1,7 @@
-import { BookmarkX, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import Link from "next/link";
-import { addResource, deleteResource, saveItemNote, setFavorite } from "@/app/(app)/mutations";
+import { addResource, deleteResource, saveItemNote } from "@/app/(app)/mutations";
+import { UnfavoriteButton } from "@/components/item-actions";
 import { EmptyState, KindBadge, PageHeader, PublishedDate } from "@/components/labels";
 import { StateForm } from "@/components/state-form";
 import { SubmitButton } from "@/components/submit-button";
@@ -11,7 +12,7 @@ import { CONTENT_KIND_LABELS, CONTENT_KINDS, type ContentKind } from "@/domain/s
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "Enregistrés" };
-const select = "h-8 rounded-lg border bg-background px-2 text-sm";
+const select = "field h-9 w-auto";
 
 export default async function SavedPage({ searchParams }: PageProps<"/enregistres">) {
   const { supabase } = await requireUser();
@@ -87,7 +88,7 @@ export default async function SavedPage({ searchParams }: PageProps<"/enregistre
               const c = f.content_items;
               const names = [...new Set(c.project_insights.map((i) => i.projects?.name).filter(Boolean))];
               return (
-                <li key={c.id} className="rounded-xl border bg-card p-4">
+                <li key={c.id} className="surface p-4">
                   <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                     <KindBadge kind={c.content_kind as ContentKind} prerelease={c.is_prerelease} />
                     <span>{c.sources?.name}</span>·<PublishedDate iso={c.published_at} />
@@ -108,11 +109,7 @@ export default async function SavedPage({ searchParams }: PageProps<"/enregistre
                     <a href={c.canonical_url} target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "sm", variant: "ghost" })}>
                       <ExternalLink aria-hidden /> Ouvrir
                     </a>
-                    <form action={setFavorite.bind(null, c.id, false)}>
-                      <Button size="sm" variant="ghost" type="submit">
-                        <BookmarkX aria-hidden /> Retirer des favoris
-                      </Button>
-                    </form>
+                    <UnfavoriteButton id={c.id} />
                   </div>
                 </li>
               );

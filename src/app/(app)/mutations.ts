@@ -7,11 +7,15 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { AI_MIN_SCORE, aiDailyBudget, enrichInsight, getAiProvider, suggestTags, type EnrichInput } from "@/domain/ai";
+import { applyExclusions, inventorySchema } from "@/domain/dependencies";
 import { fetchSource, refreshSourcesForUser } from "@/domain/ingestion";
 import { refreshProjectInsights } from "@/domain/insights";
 import { contextChanged, FEATURES, isActive, projectInputSchema, techInputSchema, type FeatureKey } from "@/domain/projects";
 import { defaultSourceKeys, parseGithubRepo } from "@/domain/sources/catalog";
 import { verifyPublicRepo } from "@/domain/sources/github";
+import { parseFeed } from "@/domain/sources/rss";
+import { checkUrl, safeFetchText } from "@/domain/sources/safe-fetch";
+import { importInventory, recomputeFindings } from "@/domain/security";
 import { getTechnology, normalizeTechKey, resolveTechnology, type TechCategory } from "@/domain/technologies";
 import type { Json } from "@/lib/database.types";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -305,19 +309,26 @@ async function recomputeAll(ctx: Ctx) {
 // ───────────────────────── Per-user content state ─────────────────────────
 
 async function upsertState(ctx: Ctx, itemId: string, patch: { is_read?: boolean; is_favorite?: boolean; note?: string | null; favorited_at?: string | null }) {
-  await ctx.supabase.from("user_content_state").upsert({ user_id: ctx.userId, content_item_id: uuid.parse(itemId), ...patch, updated_at: new Date().toISOString() }, { onConflict: "user_id,content_item_id" });
+  const { error } = await ctx.supabase
+    .from("user_content_state")
+    .upsert({ user_id: ctx.userId, content_item_id: uuid.parse(itemId), ...patch, updated_at: new Date().toISOString() }, { onConflict: "user_id,content_item_id" });
+  return !error;
 }
 
-export async function setFavorite(itemId: string, favorite: boolean) {
+export type StateResult = { ok: boolean; value: boolean };
+
+// Called from the client with optimistic UI: the result confirms (or not) the requested value.
+// No route revalidation — every view reads this state from the shared client store, and pages are dynamic.
+export async function setFavorite(itemId: string, favorite: boolean): Promise<StateResult> {
   const ctx = await requireUser();
-  await upsertState(ctx, itemId, { is_favorite: favorite, favorited_at: favorite ? new Date().toISOString() : null });
-  revalidateApp();
+  const ok = await upsertState(ctx, itemId, { is_favorite: favorite, favorited_at: favorite ? new Date().toISOString() : null });
+  return { ok, value: favorite };
 }
 
-export async function setRead(itemId: string, read: boolean) {
+export async function setRead(itemId: string, read: boolean): Promise<StateResult> {
   const ctx = await requireUser();
-  await upsertState(ctx, itemId, { is_read: read });
-  revalidateApp();
+  const ok = await upsertState(ctx, itemId, { is_read: read });
+  return { ok, value: read };
 }
 
 export async function saveItemNote(itemId: string, form: FormData) {
@@ -329,21 +340,61 @@ export async function saveItemNote(itemId: string, form: FormData) {
 
 // ───────────────────────── Per-project feedback ─────────────────────────
 
-const feedbackReason = z.enum(["wrong_topic", "wrong_level", "already_known", "wrong_source"]);
+const feedbackReason = z.enum(["wrong_topic", "wrong_level", "already_known", "wrong_source", "not_useful", "unspecified"]);
 
-export async function giveFeedback(projectId: string, itemId: string, reason: string) {
+/**
+ * « Peu pertinent » for one project and one item. The feedback is stored at the project level (never global),
+ * with a snapshot of the matched technologies and the source so its bounded effect stays explainable.
+ * « Déjà connu » also marks the item as read for this user — it does not lower the topic.
+ */
+export async function giveFeedback(projectId: string, itemId: string, reason = "unspecified"): Promise<{ ok: boolean }> {
   const ctx = await requireUser();
-  await ctx.supabase
+  const pid = uuid.parse(projectId);
+  const iid = uuid.parse(itemId);
+  const r = feedbackReason.parse(reason);
+  const [{ data: insight }, { data: item }] = await Promise.all([
+    ctx.supabase.from("project_insights").select("matched_techs").eq("project_id", pid).eq("content_item_id", iid).maybeSingle(),
+    ctx.supabase.from("content_items").select("source_id").eq("id", iid).maybeSingle(),
+  ]);
+  const { error } = await ctx.supabase
     .from("project_feedback")
-    .upsert({ project_id: uuid.parse(projectId), content_item_id: uuid.parse(itemId), reason: feedbackReason.parse(reason) }, { onConflict: "project_id,content_item_id" });
-  await recompute(ctx, projectId);
+    .upsert({ project_id: pid, content_item_id: iid, reason: r, tech_keys: insight?.matched_techs ?? [], source_id: item?.source_id ?? null }, { onConflict: "project_id,content_item_id" });
+  if (error) return { ok: false };
+  if (r === "already_known") await upsertState(ctx, iid, { is_read: true });
+  await recompute(ctx, pid);
   revalidateApp();
+  return { ok: true };
 }
 
 export async function undoFeedback(projectId: string, feedbackId: string) {
   const ctx = await requireUser();
   await ctx.supabase.from("project_feedback").delete().eq("id", uuid.parse(feedbackId)).eq("project_id", uuid.parse(projectId));
   await recompute(ctx, projectId);
+  revalidateApp();
+}
+
+/** Undo from the toast right after giving feedback (by item, the feedback id is not known client-side). */
+export async function undoFeedbackForItem(projectId: string, itemId: string): Promise<{ ok: boolean }> {
+  const ctx = await requireUser();
+  const { error } = await ctx.supabase.from("project_feedback").delete().eq("project_id", uuid.parse(projectId)).eq("content_item_id", uuid.parse(itemId));
+  await recompute(ctx, projectId);
+  revalidateApp();
+  return { ok: !error };
+}
+
+/** Reset learned adjustments for a project: all of them, or those about one source / technology / content type. */
+export async function resetLearned(projectId: string, scope: "all" | "source" | "tech" | "kind", key?: string) {
+  const ctx = await requireUser();
+  const pid = uuid.parse(projectId);
+  let q = ctx.supabase.from("project_feedback").delete().eq("project_id", pid);
+  if (scope === "source") q = q.eq("reason", "wrong_source").eq("source_id", uuid.parse(key));
+  if (scope === "tech") q = q.eq("reason", "wrong_topic").contains("tech_keys", [z.string().max(60).parse(key)]);
+  if (scope === "kind") {
+    const { data: ids } = await ctx.supabase.from("project_feedback").select("id, content_items!inner(content_kind)").eq("project_id", pid).eq("reason", "wrong_level").eq("content_items.content_kind", z.string().max(30).parse(key));
+    q = q.in("id", (ids ?? []).map((r) => r.id));
+  }
+  await q;
+  await recompute(ctx, pid);
   revalidateApp();
 }
 
@@ -497,4 +548,165 @@ export async function generateAnalysis(projectId: string, itemId: string) {
   }
   revalidatePath(back);
   redirect(`${back}?ia=${outcome}`);
+}
+
+export async function setVisualEffects(enabled: boolean) {
+  const ctx = await requireUser();
+  await ctx.supabase.from("preferences").update({ visual_effects: enabled, updated_at: new Date().toISOString() }).eq("user_id", ctx.userId);
+  revalidateApp();
+}
+
+// ───────────────────────── Command palette ─────────────────────────
+
+export type PaletteHit = { kind: "project" | "content" | "resource"; id: string; title: string; hint: string; href: string; external?: boolean };
+
+const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => "\\" + c);
+
+/** Search the caller's own data only (user client: RLS applies to every table queried). */
+export async function searchPalette(query: string): Promise<PaletteHit[]> {
+  const ctx = await requireUser();
+  const q = z.string().trim().min(2).max(80).safeParse(query);
+  if (!q.success) return [];
+  const term = escapeLike(q.data);
+  const [{ data: projects }, { data: items }, { data: resources }] = await Promise.all([
+    ctx.supabase.from("projects").select("id, name").ilike("name", `%${term}%`).limit(5),
+    ctx.supabase.rpc("feed_items", { p_q: term }).order("best_score", { ascending: false }).limit(6),
+    ctx.supabase.from("project_resources").select("id, title, url, projects(name)").ilike("title", `%${term}%`).limit(4),
+  ]);
+  return [
+    ...(projects ?? []).map((p) => ({ kind: "project" as const, id: p.id, title: p.name, hint: "Projet", href: `/projets/${p.id}` })),
+    ...(items ?? []).map((i) => ({ kind: "content" as const, id: i.id, title: i.title, hint: i.source_name ?? "Contenu", href: `/contenu/${i.id}` })),
+    ...(resources ?? []).map((r) => ({ kind: "resource" as const, id: r.id, title: r.title, hint: `Lien · ${r.projects?.name ?? ""}`, href: r.url, external: true })),
+  ];
+}
+
+// ───────────────────────── Dependency security ─────────────────────────
+
+const patternSchema = z.array(z.string().trim().max(120).regex(/^(@[a-z0-9-~._*]+\/)?[a-z0-9-~._*]+$/i)).max(50);
+
+/**
+ * Import a dependency inventory parsed in the browser (the raw file is never uploaded).
+ * The structure is re-validated here; only names of non-excluded registry packages are sent to GitHub.
+ */
+export async function importDependencies(projectId: string, payload: string, excluded: string): Promise<{ ok: true; unchecked: number; error: string | null } | { ok: false; error: string }> {
+  const ctx = await requireUser();
+  const pid = uuid.parse(projectId);
+  const { data: project } = await ctx.supabase.from("projects").select("id").eq("id", pid).maybeSingle();
+  if (!project) return { ok: false, error: "Projet introuvable." };
+  if (payload.length > 3_000_000) return { ok: false, error: "Inventaire trop volumineux." };
+  let raw: unknown;
+  try {
+    raw = JSON.parse(payload);
+  } catch {
+    return { ok: false, error: "Inventaire illisible." };
+  }
+  const parsed = inventorySchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "Inventaire invalide : structure inattendue." };
+  const patterns = patternSchema.safeParse(excluded.split(/[\s,]+/).filter(Boolean));
+  if (!patterns.success) return { ok: false, error: "Motifs d’exclusion invalides (ex. @mon-org/*, paquet-interne)." };
+  const inv = { ...parsed.data, entries: applyExclusions(parsed.data.entries, patterns.data) };
+  let admin = null;
+  try {
+    admin = createAdminClient();
+  } catch {
+    // Without the service key the inventory is stored, but advisories cannot be refreshed: shown as « incomplète ».
+  }
+  try {
+    const res = await importInventory(ctx.supabase, admin, pid, inv, patterns.data);
+    revalidatePath(`/projets/${pid}`);
+    return { ok: true, unchecked: res.unchecked, error: res.error };
+  } catch (e) {
+    console.error("dependency import failed", (e as Error).message);
+    return { ok: false, error: "Enregistrement de l’inventaire impossible." };
+  }
+}
+
+export async function reanalyzeSnapshot(projectId: string, snapshotId: string) {
+  const ctx = await requireUser();
+  await recomputeFindings(ctx.supabase, uuid.parse(snapshotId));
+  revalidatePath(`/projets/${uuid.parse(projectId)}`);
+}
+
+export async function dismissFinding(projectId: string, ghsaId: string, pkg: string, form: FormData) {
+  const ctx = await requireUser();
+  const reason = z.string().trim().min(1).max(300).safeParse(form.get("reason"));
+  if (!reason.success) return;
+  await ctx.supabase
+    .from("finding_dismissals")
+    .upsert({ project_id: uuid.parse(projectId), ghsa_id: z.string().max(40).parse(ghsaId), package: z.string().max(214).parse(pkg), reason: reason.data }, { onConflict: "project_id,ghsa_id,package" });
+  revalidatePath(`/projets/${projectId}`);
+}
+
+export async function restoreFinding(projectId: string, ghsaId: string, pkg: string) {
+  const ctx = await requireUser();
+  await ctx.supabase.from("finding_dismissals").delete().eq("project_id", uuid.parse(projectId)).eq("ghsa_id", ghsaId).eq("package", pkg);
+  revalidatePath(`/projets/${projectId}`);
+}
+
+// ───────────────────────── Source proposals ─────────────────────────
+
+const MAX_PENDING_PROPOSALS = 5;
+
+export async function proposeSource(_: FormState, form: FormData): Promise<FormState> {
+  const ctx = await requireUser();
+  const parsed = z
+    .object({
+      url: z.string().trim().max(2000),
+      language: z.enum(["fr", "en", "other"]),
+      topics: z.array(z.string().trim().min(1).max(40)).max(10),
+      justification: z.string().trim().max(1000).optional(),
+    })
+    .safeParse({
+      url: form.get("url"),
+      language: form.get("language"),
+      topics: String(form.get("topics") ?? "")
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
+      justification: form.get("justification") || undefined,
+    });
+  if (!parsed.success) return { error: "Vérifie les champs : URL, langue et au plus 10 sujets." };
+  // Static checks only: no request is made when a proposal is submitted.
+  const problem = checkUrl(parsed.data.url);
+  if (problem) return { error: problem };
+  const { count } = await ctx.supabase.from("source_proposals").select("id", { count: "exact", head: true }).eq("user_id", ctx.userId).eq("status", "pending");
+  if ((count ?? 0) >= MAX_PENDING_PROPOSALS) return { error: `Tu as déjà ${MAX_PENDING_PROPOSALS} propositions en attente.` };
+  const { error } = await ctx.supabase.from("source_proposals").insert({ ...parsed.data, user_id: ctx.userId });
+  if (error) return { error: "Envoi impossible. Réessaie." };
+  revalidatePath("/parametres");
+  return { message: "Merci ! Proposition en attente de modération : elle ne déclenche aucune collecte." };
+}
+
+async function requireAdmin() {
+  const ctx = await requireUser();
+  const { data } = await ctx.supabase.rpc("is_admin");
+  if (data !== true) throw new Error("Accès réservé à la modération.");
+  return ctx;
+}
+
+/** Moderator-only network check of a proposed feed, through the SSRF-safe fetcher. */
+export async function validateProposal(proposalId: string) {
+  const ctx = await requireAdmin();
+  const { data: p } = await ctx.supabase.from("source_proposals").select("url").eq("id", uuid.parse(proposalId)).single();
+  if (!p) return;
+  let validation: Record<string, unknown>;
+  try {
+    const res = await safeFetchText(p.url);
+    const items = parseFeed(res.body, res.finalUrl);
+    const dated = items.flatMap((i) => (i.publishedAt ? [i.publishedAt] : [])).sort();
+    validation = { ok: items.length > 0, items: items.length, latest: dated.at(-1) ?? null, finalUrl: res.finalUrl, redirects: res.redirects, sample: items.slice(0, 3).map((i) => i.title) };
+  } catch (e) {
+    validation = { ok: false, error: (e as Error).message.slice(0, 200) };
+  }
+  await ctx.supabase.from("source_proposals").update({ validation: { ...validation, checkedAt: new Date().toISOString() } as NonNullable<Json> }).eq("id", proposalId);
+  revalidatePath("/moderation");
+}
+
+export async function reviewProposal(proposalId: string, form: FormData) {
+  const ctx = await requireAdmin();
+  const status = z.enum(["accepted", "rejected"]).parse(form.get("status"));
+  const note = z.string().trim().max(1000).parse(form.get("note") ?? "");
+  // Accepting records the decision only: adding to the shared catalog stays a reviewed code change (catalog.ts).
+  await ctx.supabase.from("source_proposals").update({ status, review_note: note || null, reviewed_at: new Date().toISOString(), reviewed_by: ctx.userId }).eq("id", uuid.parse(proposalId));
+  revalidatePath("/moderation");
 }
