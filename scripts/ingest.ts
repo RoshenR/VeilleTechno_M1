@@ -4,7 +4,10 @@ import { loadEnvConfig } from "@next/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runIngestion } from "@/domain/ingestion";
 
-loadEnvConfig(process.cwd());
+// dev=true: .env.local / .env.development.local. Without it Next loads .env.production*, i.e. a pulled
+// production configuration — a CLI run must never hit production unless NODE_ENV=production is explicit.
+loadEnvConfig(process.cwd(), process.env.NODE_ENV !== "production");
+console.log(`Base cible : ${new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://invalide").host}`);
 
 async function main() {
   const db = createAdminClient();

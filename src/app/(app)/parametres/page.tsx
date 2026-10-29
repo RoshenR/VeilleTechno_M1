@@ -1,10 +1,12 @@
 import { CheckCircle2, CircleSlash } from "lucide-react";
-import { toggleHiddenSource, updatePreferences } from "@/app/(app)/mutations";
+import { proposeSource, setVisualEffects, toggleHiddenSource, updatePreferences } from "@/app/(app)/mutations";
+import { SubmitButton } from "@/components/submit-button";
 import { formatDateTime, PageHeader } from "@/components/labels";
 import { StateForm } from "@/components/state-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { aiDailyBudget, getAiProvider } from "@/domain/ai";
+import { githubTokenConfigured } from "@/domain/sources/github";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "Paramètres" };
@@ -23,10 +25,11 @@ function Status({ ok, label, detail }: { ok: boolean; label: string; detail: str
 
 export default async function SettingsPage() {
   const { supabase, userId } = await requireUser();
-  const [{ data: prefs }, { data: subs }, { data: catalog }] = await Promise.all([
+  const [{ data: prefs }, { data: subs }, { data: catalog }, { data: proposals }] = await Promise.all([
     supabase.from("preferences").select("*").eq("user_id", userId).single(),
     supabase.from("project_sources").select("source_id, projects(name), sources(id, name, kind, last_error, last_success_at)"),
     supabase.from("sources").select("id, name, kind, language, in_catalog, last_error, last_success_at").eq("in_catalog", true).order("name"),
+    supabase.from("source_proposals").select("id, url, language, topics, status, review_note, reviewed_at, created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(20),
   ]);
   const provider = getAiProvider();
   const hidden = new Set(prefs?.hidden_source_ids ?? []);
@@ -44,7 +47,7 @@ export default async function SettingsPage() {
     <>
       <PageHeader title="Paramètres" description="Préférences appliquées au classement de tous tes projets." />
       <div className="grid gap-8 lg:grid-cols-2">
-        <section aria-labelledby="prefs" className="space-y-3 rounded-xl border bg-card p-5">
+        <section aria-labelledby="prefs" className="surface space-y-3 p-5">
           <h2 id="prefs" className="font-semibold">
             Préférences de veille
           </h2>
@@ -83,20 +86,81 @@ export default async function SettingsPage() {
           </StateForm>
         </section>
 
-        <section aria-labelledby="services" className="space-y-3 rounded-xl border bg-card p-5">
+        <section aria-labelledby="services" className="surface space-y-3 p-5">
           <h2 id="services" className="font-semibold">
             Services
           </h2>
           <ul className="space-y-3 text-sm">
             <Status ok label="Base de données et authentification" detail="Supabase (PostgreSQL + Auth), données isolées par compte via Row Level Security." />
             <Status ok={Boolean(process.env.SUPABASE_SECRET_KEY)} label="Collecte des sources" detail="Planification quotidienne et actualisation manuelle (limitée à une fois toutes les 10 minutes)." />
-            <Status ok={Boolean(process.env.GITHUB_TOKEN)} label="Jeton GitHub" detail={process.env.GITHUB_TOKEN ? "Quota GitHub authentifié." : "Sans jeton, l’API GitHub limite à 60 requêtes/heure : certaines releases peuvent être collectées plus tard."} />
+            <Status ok={githubTokenConfigured()} label="Jeton GitHub (serveur)" detail={githubTokenConfigured() ? "Appels GitHub authentifiés (releases, avis de sécurité)." : "Sans jeton, l’API GitHub limite à 60 requêtes/heure : releases et avis de sécurité peuvent être reportés."} />
             <Status
               ok={Boolean(provider)}
               label="Enrichissement IA"
               detail={provider ? `${provider.name} · ${used}/${aiDailyBudget()} analyses utilisées aujourd’hui · ${prefs?.ai_enabled ? "activé pour ton compte" : "désactivé pour ton compte"}` : "Aucun fournisseur configuré : explications issues des règles uniquement."}
             />
           </ul>
+        </section>
+        <section aria-labelledby="effects" className="surface space-y-3 p-5">
+          <h2 id="effects" className="font-semibold">
+            Effets visuels
+          </h2>
+          <p className="text-sm text-muted-foreground">Radar 3D, inclinaisons et animations décoratives. Désactivés, l’application reste complète avec un rendu statique. La préférence « réduire les animations » du système est toujours respectée.</p>
+          <form action={setVisualEffects.bind(null, !(prefs?.visual_effects ?? true))} className="flex items-center gap-3">
+            <span className="text-sm">
+              Actuellement : <strong>{prefs?.visual_effects ?? true ? "activés" : "désactivés"}</strong>
+            </span>
+            <SubmitButton size="sm" variant="outline" aria-pressed={prefs?.visual_effects ?? true}>
+              {prefs?.visual_effects ?? true ? "Désactiver les effets" : "Activer les effets"}
+            </SubmitButton>
+          </form>
+        </section>
+
+        <section aria-labelledby="propose" className="surface space-y-3 p-5">
+          <h2 id="propose" className="font-semibold">
+            Proposer une source
+          </h2>
+          <p className="text-sm text-muted-foreground">La proposition reste en attente de modération : elle ne déclenche aucune collecte et n’est pas ajoutée automatiquement au catalogue partagé.</p>
+          <StateForm action={proposeSource} submitLabel="Envoyer la proposition">
+            <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+              URL du flux RSS/Atom (https)
+              <Input name="url" type="url" required maxLength={2000} placeholder="https://exemple.fr/feed.xml" />
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+                Langue
+                <select name="language" className="field" defaultValue="fr">
+                  <option value="fr">Français</option>
+                  <option value="en">Anglais</option>
+                  <option value="other">Autre</option>
+                </select>
+              </label>
+              <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+                Sujets (séparés par des virgules)
+                <Input name="topics" maxLength={400} placeholder="ex. react, accessibilité" />
+              </label>
+            </div>
+            <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+              Pourquoi cette source ? (facultatif)
+              <textarea name="justification" maxLength={1000} rows={2} className="field h-auto py-2" />
+            </label>
+          </StateForm>
+          {(proposals?.length ?? 0) > 0 && (
+            <div className="border-t pt-3">
+              <p className="eyebrow mb-2">Mes propositions</p>
+              <ul className="space-y-2 text-sm">
+                {proposals!.map((p) => (
+                  <li key={p.id} className="rounded-lg border bg-card px-3 py-2">
+                    <span className="block truncate font-mono text-xs">{p.url}</span>
+                    <span className="text-xs">
+                      {{ pending: "En attente", accepted: "Acceptée", rejected: "Refusée" }[p.status] ?? p.status} · proposée le {formatDateTime(p.created_at)}
+                    </span>
+                    {p.review_note && <span className="block text-xs text-muted-foreground">Retour de modération : {p.review_note}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
       </div>
 
@@ -108,7 +172,7 @@ export default async function SettingsPage() {
         {!followed.size ? (
           <p className="text-sm text-muted-foreground">Aucune source suivie.</p>
         ) : (
-          <ul className="divide-y rounded-xl border bg-card text-sm">
+          <ul className="divide-y surface text-sm">
             {[...followed.entries()].map(([id, s]) => (
               <li key={id} className="flex flex-wrap items-center justify-between gap-2 p-3">
                 <span>

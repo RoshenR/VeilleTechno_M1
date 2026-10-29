@@ -1,8 +1,8 @@
-import { Plus, Search } from "lucide-react";
+import { FolderPlus, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { EmptyState, PageHeader, TechBadge } from "@/components/labels";
+import { TiltCard } from "@/components/tilt-card";
 import { buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { STAGE_LABELS, TECH_STATUS_LABELS, type Stage, type TechStatus } from "@/domain/projects";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -36,8 +36,8 @@ export default async function ProjectsPage({ searchParams }: PageProps<"/projets
           Rechercher un projet
         </label>
         <div className="relative w-full max-w-xs">
-          <Search className="absolute left-2 top-2 size-4 text-muted-foreground" aria-hidden />
-          <Input id="q" name="q" defaultValue={q} placeholder="Rechercher…" className="pl-8" />
+          <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <input id="q" name="q" defaultValue={q} placeholder="Rechercher…" className="field pl-9" />
         </div>
         {showArchived && <input type="hidden" name="archives" value="1" />}
         <button type="submit" className={buttonVariants({ variant: "outline", size: "sm" })}>
@@ -52,16 +52,21 @@ export default async function ProjectsPage({ searchParams }: PageProps<"/projets
         q || showArchived ? (
           <EmptyState title={showArchived ? "Aucun projet archivé" : "Aucun projet ne correspond à cette recherche"} />
         ) : (
-          <EmptyState title="Bienvenue sur StackSignal">
-            <p>Décris un projet — même une simple idée — pour recevoir une veille adaptée.</p>
-            <div className="mt-3 flex justify-center gap-2">
-              <Link href="/projets/nouveau" className={buttonVariants()}>
-                Créer mon premier projet
-              </Link>
-              <Link href="/demo" className={buttonVariants({ variant: "outline" })}>
-                Voir la démonstration
-              </Link>
-            </div>
+          <EmptyState
+            icon={<FolderPlus aria-hidden />}
+            title="Bienvenue sur StackSignal"
+            action={
+              <>
+                <Link href="/projets/nouveau" className={buttonVariants()}>
+                  Créer mon premier projet
+                </Link>
+                <Link href="/demo" className={buttonVariants({ variant: "outline" })}>
+                  Voir la démonstration
+                </Link>
+              </>
+            }
+          >
+            <p>Décris un projet — même une simple idée — pour recevoir une veille adaptée. La stack est facultative.</p>
           </EmptyState>
         )
       ) : (
@@ -72,10 +77,11 @@ export default async function ProjectsPage({ searchParams }: PageProps<"/projets
             const other = p.project_technologies.filter((t) => t.status !== "used");
             return (
               <li key={p.id}>
-                <Link href={`/projets/${p.id}`} className="block h-full rounded-xl border bg-card p-4 hover:border-primary/50">
+                <TiltCard>
+                <Link href={`/projets/${p.id}`} className="surface block h-full p-5 transition-[border-color,box-shadow] duration-200 hover:border-primary/40 hover:shadow-md">
                   <div className="flex items-start justify-between gap-2">
-                    <h2 className="font-medium">{p.name}</h2>
-                    <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs">{STAGE_LABELS[p.stage as Stage]}</span>
+                    <h2 className="font-semibold tracking-[-0.01em]">{p.name}</h2>
+                    <span className="shrink-0 rounded-full border border-primary/25 bg-accent px-2 py-0.5 text-xs text-accent-foreground">{STAGE_LABELS[p.stage as Stage]}</span>
                   </div>
                   <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{p.description}</p>
                   <div className="mt-3 flex flex-wrap gap-1">
@@ -99,6 +105,7 @@ export default async function ProjectsPage({ searchParams }: PageProps<"/projets
                     )}
                   </p>
                 </Link>
+                </TiltCard>
               </li>
             );
           })}

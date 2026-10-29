@@ -1,19 +1,9 @@
 import { createHash } from "node:crypto";
 import { foldText } from "../technologies";
 
-export const CONTENT_KINDS = ["release", "tutorial", "tool", "experience", "breaking", "security", "news"] as const;
-export type ContentKind = (typeof CONTENT_KINDS)[number];
-export const CONTENT_KIND_LABELS: Record<ContentKind, string> = {
-  release: "Release",
-  tutorial: "Tutoriel",
-  tool: "Outil",
-  experience: "Retour d’expérience",
-  breaking: "Changement important",
-  security: "Sécurité",
-  news: "Actualité",
-};
-/** News decays fast; background resources are judged on usefulness before recency. */
-export const isNewsKind = (k: ContentKind) => k === "release" || k === "breaking" || k === "security" || k === "news";
+import type { ContentKind } from "../vocabulary";
+
+export { CONTENT_KIND_LABELS, CONTENT_KINDS, isNewsKind, type ContentKind } from "../vocabulary";
 
 export type NormalizedItem = {
   externalId: string;
@@ -82,7 +72,7 @@ export function parseDate(v: unknown): string | null {
 }
 
 const KIND_RULES: [ContentKind, RegExp][] = [
-  ["security", /\b(security|vulnerabilit(y|ies)|cve-\d{4}|securite|patch(ed)? .*(exploit|vulnerab)|advisory)\b/],
+  ["security", /\b(security|vulnerabilit(y|ies|es?)|cve-\d{4}|securite|patch(ed)? .*(exploit|vulnerab)|advisory)\b/],
   ["breaking", /\b(breaking changes?|deprecat\w*|end[- ]of[- ]life|eol|sunset(ting)?|removed support|migration guide)\b/],
   ["experience", /\b(how we|lessons learned|case study|postmortem|post-mortem|retour d.experience|our journey|in production at)\b/],
   ["tutorial", /\b(how to|tutorial|tutoriel|guide|step[- ]by[- ]step|getting started|learn|walkthrough|comment (faire|creer|utiliser|mettre))\b/],

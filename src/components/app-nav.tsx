@@ -1,23 +1,25 @@
 "use client";
 
-import { Bookmark, FolderKanban, ListChecks, Radar, Settings } from "lucide-react";
+import { Bookmark, CalendarRange, FolderKanban, ListChecks, Radar, Settings, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 export const NAV = [
-  { href: "/veille", label: "Ma veille", icon: Radar },
-  { href: "/projets", label: "Mes projets", icon: FolderKanban },
-  { href: "/enregistres", label: "Enregistrés", icon: Bookmark },
-  { href: "/actions", label: "Actions", icon: ListChecks },
-  { href: "/parametres", label: "Paramètres", icon: Settings },
+  { href: "/veille", label: "Ma veille", short: "Veille", icon: Radar },
+  { href: "/synthese", label: "Synthèse de la semaine", short: "Synthèse", icon: CalendarRange },
+  { href: "/projets", label: "Mes projets", short: "Projets", icon: FolderKanban },
+  { href: "/enregistres", label: "Enregistrés", short: "Enregistrés", icon: Bookmark },
+  { href: "/actions", label: "Actions", short: "Actions", icon: ListChecks },
+  { href: "/parametres", label: "Paramètres", short: "Réglages", icon: Settings },
 ] as const;
 
-export function AppNav({ variant }: { variant: "sidebar" | "bar" }) {
+export function AppNav({ variant, isAdmin = false }: { variant: "sidebar" | "bar"; isAdmin?: boolean }) {
   const path = usePathname();
+  const items = [...NAV.filter((n) => variant === "sidebar" || n.href !== "/actions"), ...(isAdmin && variant === "sidebar" ? [{ href: "/moderation", label: "Modération", short: "Modération", icon: ShieldCheck }] : [])];
   return (
-    <ul className={variant === "sidebar" ? "grid gap-0.5" : "flex justify-around"}>
-      {NAV.map(({ href, label, icon: Icon }) => {
+    <ul className={variant === "sidebar" ? "grid gap-0.5" : "grid grid-cols-5"}>
+      {items.map(({ href, label, short, icon: Icon }) => {
         const active = path === href || path.startsWith(`${href}/`);
         return (
           <li key={href}>
@@ -26,13 +28,17 @@ export function AppNav({ variant }: { variant: "sidebar" | "bar" }) {
               aria-current={active ? "page" : undefined}
               className={cn(
                 variant === "sidebar"
-                  ? "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm hover:bg-sidebar-accent"
-                  : "flex flex-col items-center gap-0.5 px-2 py-1.5 text-[0.7rem]",
-                active ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground" : "text-muted-foreground",
+                  ? "relative flex h-9 items-center gap-2.5 rounded-lg px-3 text-sm transition-colors duration-150 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
+                  : "flex min-h-14 flex-col items-center justify-center gap-1 px-1 text-[0.7rem]",
+                active
+                  ? variant === "sidebar"
+                    ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground shadow-xs before:absolute before:inset-y-2 before:-left-3 before:w-[3px] before:rounded-full before:bg-primary"
+                    : "font-medium text-primary"
+                  : "text-muted-foreground",
               )}
             >
-              <Icon className="size-4" aria-hidden />
-              {label}
+              <Icon className={cn("size-4", active && "text-primary")} aria-hidden />
+              {variant === "sidebar" ? label : short}
             </Link>
           </li>
         );

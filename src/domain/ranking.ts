@@ -11,7 +11,7 @@ import { FEATURES, type FeatureKey, type Stage, type TechStatus } from "./projec
 import { aliasesFor, foldText, getTechnology } from "./technologies";
 import { isNewsKind, type ContentKind } from "./sources/normalize";
 
-export const RANKING_VERSION = 1;
+export const RANKING_VERSION = 2;
 export const INCLUDE_THRESHOLD = 30;
 export const PRIORITY_THRESHOLD = 65;
 
@@ -27,7 +27,20 @@ export type RankProject = {
   dismissedItemIds: Set<string>;
   /** source id → number of « mauvaise source » feedbacks */
   sourcePenalties: Map<string, number>;
+  /** tech key → number of « mauvais sujet » feedbacks on items about it (this project only) */
+  techPenalties?: Map<string, number>;
+  /** content kind → number of « mauvais niveau » feedbacks (this project only) */
+  kindPenalties?: Map<string, number>;
 };
+
+// Feedback adjustments are bounded so that no single click (nor a handful) can exclude a technology,
+// a source or a content type: they only lower the score, and are reset by deleting the feedback.
+export const FEEDBACK_BOUNDS = {
+  source: { per: 10, max: 20 },
+  tech: { per: 4, max: 8 },
+  kind: { per: 3, max: 6 },
+  total: 24,
+} as const;
 
 export type RankItem = {
   id: string;
@@ -41,13 +54,8 @@ export type RankItem = {
   source: { quality: number; isOfficial: boolean; techKeys: string[]; name: string };
 };
 
-export type Priority = "explore" | "watch" | "verify" | "action";
-export const PRIORITY_LABELS: Record<Priority, string> = {
-  explore: "À explorer",
-  watch: "À surveiller",
-  verify: "Applicabilité à vérifier",
-  action: "Action prioritaire",
-};
+import type { Priority } from "./vocabulary";
+export { PRIORITY_LABELS, type Priority } from "./vocabulary";
 
 export type Reason = { factor: "tech" | "needs" | "stage" | "source" | "freshness" | "penalty"; points: number; label: string };
 export type RankResult =
@@ -89,7 +97,10 @@ export function rankItem(p: RankProject, item: RankItem, now = Date.now()): Rank
   if (p.stage === "paused") return { included: false, excludedBy: "Projet en pause" };
   if (p.dismissedItemIds.has(item.id)) return { included: false, excludedBy: "Marqué peu pertinent" };
   if (p.hiddenSourceIds.includes(item.sourceId)) return { included: false, excludedBy: "Source masquée" };
-  if (item.language && p.languages.length && !p.languages.includes(item.language)) return { included: false, excludedBy: "Langue exclue" };
+  // Language preference, except for essential official announcements (security, breaking changes).
+  const essential = item.source.isOfficial && (item.kind === "security" || item.kind === "breaking");
+  const otherLanguage = Boolean(item.language && p.languages.length && !p.languages.includes(item.language));
+  if (otherLanguage && !essential) return { included: false, excludedBy: "Langue exclue" };
 
   const title = foldText(item.title);
   const body = `${title} ${foldText(item.excerpt ?? "")}`;
@@ -149,15 +160,28 @@ export function rankItem(p: RankProject, item: RankItem, now = Date.now()): Rank
   reasons.push({ factor: "freshness", points: f.points, label: f.label });
 
   // ── explicit feedback ──
-  const penaltyCount = p.sourcePenalties.get(item.sourceId) ?? 0;
-  const penalty = Math.min(20, penaltyCount * 10);
-  if (penalty) reasons.push({ factor: "penalty", points: -penalty, label: "Source signalée comme peu pertinente pour ce projet" });
+  const B = FEEDBACK_BOUNDS;
+  const sourcePenalty = Math.min(B.source.max, (p.sourcePenalties.get(item.sourceId) ?? 0) * B.source.per);
+  if (sourcePenalty) reasons.push({ factor: "penalty", points: -sourcePenalty, label: "Source signalée « mauvaise source » pour ce projet" });
+  const techHit = matchedTechs.map((t) => ({ t, n: p.techPenalties?.get(t.key) ?? 0 })).find((x) => x.n > 0);
+  const techPenalty = techHit ? Math.min(B.tech.max, techHit.n * B.tech.per) : 0;
+  if (techPenalty) reasons.push({ factor: "penalty", points: -techPenalty, label: `Sujet « ${techHit!.t.name} » signalé hors sujet ${techHit!.n} fois pour ce projet` });
+  const kindPenalty = Math.min(B.kind.max, (p.kindPenalties?.get(item.kind) ?? 0) * B.kind.per);
+  if (kindPenalty) reasons.push({ factor: "penalty", points: -kindPenalty, label: "Type de contenu signalé « mauvais niveau » pour ce projet" });
+  const penalty = Math.min(B.total, sourcePenalty + techPenalty + kindPenalty);
+  if (otherLanguage) reasons.push({ factor: "source", points: 0, label: "Annonce officielle importante, conservée malgré la langue" });
 
   const score = Math.max(0, Math.min(100, techPoints + needsPoints + stagePoints + sourcePoints + f.points - penalty));
   if (score < INCLUDE_THRESHOLD) return { included: false, excludedBy: "Pertinence insuffisante" };
 
   const priority = priorityFor(p, item, matchedTechs, score);
-  const why = [reasons.find((r) => r.factor === "tech")?.label, reasons.find((r) => r.factor === "needs")?.label?.replace(/^Lié à/, "lié à"), stagePoints >= W.stage * 0.8 ? `adapté au stade « ${stageName(p.stage)} »` : null]
+  // Built from the same factors as the score, including feedback adjustments, so the explanation matches the ranking.
+  const why = [
+    reasons.find((r) => r.factor === "tech")?.label,
+    reasons.find((r) => r.factor === "needs")?.label?.replace(/^Lié à/, "lié à"),
+    stagePoints >= W.stage * 0.8 ? `adapté au stade « ${stageName(p.stage)} »` : null,
+    penalty ? "rang abaissé d’après tes retours" : null,
+  ]
     .filter(Boolean)
     .join(" · ");
 

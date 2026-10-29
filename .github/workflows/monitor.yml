@@ -1,0 +1,34 @@
+name: Collect monitor
+
+# Independent dead-man's switch: checks the production « last successful collection » endpoint from outside
+# Vercel. A failed run (stale or unreachable) is reported by GitHub to the repository's watchers (email by default).
+# Inactive until the repository variable HEALTHCHECK_URL is set (Settings → Secrets and variables → Actions → Variables),
+# e.g. https://<domaine>/api/health/ingestion. No secret is needed.
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  last-success:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check last successful scheduled collection
+        env:
+          HEALTHCHECK_URL: ${{ vars.HEALTHCHECK_URL }}
+        run: |
+          if [ -z "$HEALTHCHECK_URL" ]; then
+            echo "::notice::HEALTHCHECK_URL n'est pas défini : surveillance inactive."
+            exit 0
+          fi
+          code=$(curl -s -o body.json -w '%{http_code}' --max-time 30 "$HEALTHCHECK_URL")
+          cat body.json; echo
+          if [ "$code" != "200" ]; then
+            echo "::error::Dernière collecte réussie trop ancienne ou endpoint indisponible (HTTP $code)."
+            exit 1
+          fi

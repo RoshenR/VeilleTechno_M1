@@ -1,12 +1,44 @@
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/database.types";
 import { isActive, type FeatureKey, type Stage, type TechStatus } from "./projects";
-import { rankItem, type RankItem, type RankProject } from "./ranking";
+import { RANKING_VERSION, rankItem, type RankItem, type RankProject } from "./ranking";
+import { SOURCE_CATALOG } from "./sources/catalog";
 import type { ContentKind } from "./sources/normalize";
+import { TECHNOLOGIES } from "./technologies";
 
 type Db = SupabaseClient<Database>;
 
 const CANDIDATE_LIMIT = 600;
+
+/**
+ * Version of everything that shapes an analysis apart from the project's own context (context_version)
+ * and its feedback (recomputed on the spot): ranking rules, technology catalog and aliases, source catalog.
+ * Changing any of them changes the signature, and the scheduler recomputes the affected projects in the background.
+ */
+export const RANKING_SIGNATURE = createHash("sha256")
+  .update(JSON.stringify([RANKING_VERSION, TECHNOLOGIES, SOURCE_CATALOG.map((s) => [s.key, s.techKeys, s.quality, s.isOfficial, s.language])]))
+  .digest("hex")
+  .slice(0, 16);
+
+type FeedbackRow = { content_item_id: string; reason: string; tech_keys: string[]; source_id: string | null; content_items: { source_id: string; content_kind: string } | null };
+
+/** Feedback → bounded per-project adjustments (see FEEDBACK_BOUNDS). Every reason except « mauvaise source » hides that item for this project only. */
+export function feedbackAdjustments(feedback: FeedbackRow[]) {
+  const count = (m: Map<string, number>, k: string | null | undefined) => k && m.set(k, (m.get(k) ?? 0) + 1);
+  const sourcePenalties = new Map<string, number>();
+  const techPenalties = new Map<string, number>();
+  const kindPenalties = new Map<string, number>();
+  const dismissed = new Set<string>();
+  for (const f of feedback) {
+    if (f.reason === "wrong_source") count(sourcePenalties, f.source_id ?? f.content_items?.source_id);
+    else dismissed.add(f.content_item_id);
+    if (f.reason === "wrong_topic") for (const t of f.tech_keys) count(techPenalties, t);
+    if (f.reason === "wrong_level") count(kindPenalties, f.content_items?.content_kind);
+    // « Déjà connu » acts on the item's read state (see giveFeedback), never on the topic.
+  }
+  return { sourcePenalties, techPenalties, kindPenalties, dismissed };
+}
 
 /**
  * Recompute deterministic insights for one project. Works with the user's client (RLS: owner only)
@@ -22,7 +54,7 @@ export async function refreshProjectInsights(db: Db, projectId: string): Promise
   if (error || !project) throw new Error(error?.message ?? "Projet introuvable");
 
   const markDone = () =>
-    db.from("projects").update({ insights_version: project.context_version, insights_refreshed_at: new Date().toISOString() }).eq("id", projectId);
+    db.from("projects").update({ insights_version: project.context_version, insights_refreshed_at: new Date().toISOString(), ranking_signature: RANKING_SIGNATURE }).eq("id", projectId);
 
   // Paused / archived projects stay readable but get no new recommendations.
   if (!isActive(project)) {
@@ -33,7 +65,7 @@ export async function refreshProjectInsights(db: Db, projectId: string): Promise
   const sourceIds = project.project_sources.map((s) => s.source_id);
   const [{ data: prefs }, { data: feedback }, { data: items, error: itemsError }] = await Promise.all([
     db.from("preferences").select("*").eq("user_id", project.owner_id).maybeSingle(),
-    db.from("project_feedback").select("content_item_id, reason, content_items(source_id)").eq("project_id", projectId),
+    db.from("project_feedback").select("content_item_id, reason, tech_keys, source_id, content_items(source_id, content_kind)").eq("project_id", projectId),
     sourceIds.length
       ? db
           .from("content_items")
@@ -45,10 +77,7 @@ export async function refreshProjectInsights(db: Db, projectId: string): Promise
   ]);
   if (itemsError) throw new Error(itemsError.message);
 
-  const penalties = new Map<string, number>();
-  for (const f of feedback ?? []) {
-    if (f.reason === "wrong_source" && f.content_items) penalties.set(f.content_items.source_id, (penalties.get(f.content_items.source_id) ?? 0) + 1);
-  }
+  const adj = feedbackAdjustments(feedback ?? []);
 
   const rp: RankProject = {
     stage: project.stage as Stage,
@@ -58,8 +87,10 @@ export async function refreshProjectInsights(db: Db, projectId: string): Promise
     excludedTopics: prefs?.excluded_topics ?? [],
     languages: prefs?.languages ?? [],
     hiddenSourceIds: prefs?.hidden_source_ids ?? [],
-    dismissedItemIds: new Set((feedback ?? []).filter((f) => f.reason !== "wrong_source").map((f) => f.content_item_id)),
-    sourcePenalties: penalties,
+    dismissedItemIds: adj.dismissed,
+    sourcePenalties: adj.sourcePenalties,
+    techPenalties: adj.techPenalties,
+    kindPenalties: adj.kindPenalties,
   };
 
   const now = Date.now();

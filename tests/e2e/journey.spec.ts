@@ -13,7 +13,7 @@ async function signUp(page: Page, email: string) {
 
 test("création → veille → favori → action → retour, persistants après rechargement", async ({ page }) => {
   await signUp(page, `e2e-${Date.now()}@example.test`);
-  await expect(page.getByText("Aucun projet actif")).toBeVisible();
+  await expect(page.getByText("Commence par décrire un projet")).toBeVisible();
   await page.getByRole("link", { name: "Créer mon premier projet" }).first().click();
 
   await page.getByLabel("Nom du projet *").fill("Réservation salon");
@@ -30,7 +30,7 @@ test("création → veille → favori → action → retour, persistants après 
   await page.getByRole("link", { name: "Veille", exact: true }).click();
   const first = page.locator("article").first();
   await expect(first).toBeVisible();
-  await expect(first.getByText(/Pourquoi pour ce projet/)).toBeVisible();
+  await expect(first.getByText(/Pour ton projet/)).toBeVisible();
   const title = (await first.locator("h3").innerText()).trim();
 
   // Favorite
@@ -39,6 +39,7 @@ test("création → veille → favori → action → retour, persistants après 
 
   // Action from the item
   const card = page.locator("article", { hasText: title }).first();
+  await card.getByRole("button", { name: /Plus d’actions/ }).click();
   await card.getByText("Créer une action").click();
   await card.getByRole("button", { name: "Créer l’action" }).click();
   await expect(card.getByText("Action créée.")).toBeVisible();
@@ -54,14 +55,17 @@ test("création → veille → favori → action → retour, persistants après 
   await page.goto("/veille");
   const target = page.locator("article").first();
   const targetTitle = (await target.locator("h3").innerText()).trim();
-  await target.getByText("Peu pertinent").click();
-  await target.getByRole("button", { name: "Déjà connu" }).click();
+  await target.getByRole("button", { name: /Plus d’actions/ }).click();
+  await target.getByRole("button", { name: /^Déjà connu/ }).click();
+  // Hidden at once (optimistic), with an « Annuler » notification that does not take focus.
   await expect(page.locator("article h3", { hasText: targetTitle })).toHaveCount(0);
-  await page.getByRole("link", { name: "Mes projets" }).first().click();
-  await page.getByRole("link", { name: /Réservation salon/ }).click();
+  await expect(page.getByRole("status").getByRole("button", { name: "Annuler" })).toBeVisible();
+  await page.goto("/projets");
+  await page.getByRole("main").getByRole("link", { name: /Réservation salon/ }).first().click();
+  await page.getByText(/Contenus retirés de ce projet/).click();
   await expect(page.getByText(targetTitle)).toBeVisible();
   await page.getByRole("button", { name: "Annuler" }).first().click();
-  await expect(page.getByText("Aucun retour.")).toBeVisible();
+  await expect(page.getByText(/Aucun retour\./)).toBeVisible();
 });
 
 test("un projet sans stack reçoit une veille fondée sur ses besoins", async ({ page }) => {
