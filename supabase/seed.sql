@@ -1,0 +1,2 @@
+-- The source/technology catalog lives in src/domain (single source of truth)
+-- and is upserted by every ingestion run (npm run ingest). Demo data never goes in the database.
